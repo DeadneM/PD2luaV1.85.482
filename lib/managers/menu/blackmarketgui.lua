@@ -1821,6 +1821,10 @@ function BlackMarketGuiSlotItem:refresh()
 		end
 	end
 end
+
+function BlackMarketGuiSlotItem:set_visible(visible)
+	self._panel:set_visible(visible)
+end
 BlackMarketGuiMaskSlotItem = BlackMarketGuiMaskSlotItem or class(BlackMarketGuiSlotItem)
 
 function BlackMarketGuiMaskSlotItem:init(main_panel, data, x, y, w, h)
