@@ -696,7 +696,7 @@ function ContractBrokerGui:perform_filter_search(job_tweak)
 		if #search_text > 0 then
 			local job_name = string.lower(managers.localization:text(job_tweak.name_id or "no name_id"))
 
-			if string.find(job_name, search_text) then
+			if string.find(job_name, search_text, nil, true) then
 				return true
 			end
 
@@ -705,7 +705,7 @@ function ContractBrokerGui:perform_filter_search(job_tweak)
 			if contact_tweak then
 				local contact_name = string.lower(managers.localization:text(contact_tweak.name_id or "no name_id"))
 
-				if string.find(contact_name, search_text) then
+				if string.find(contact_name, search_text, nil, true) then
 					return true
 				end
 			end
