@@ -3613,7 +3613,27 @@ end
 function WeaponTweakData:_pickup_chance(max_ammo, selection_index)
 	local low, high = nil
 
-	if selection_index == PICKUP.AR_HIGH_CAPACITY then
+	if _G.IS_VR then
+		if selection_index == PICKUP.AR_HIGH_CAPACITY then
+			low = 0.04
+			high = 0.065
+		elseif selection_index == PICKUP.AR_MED_CAPACITY then
+			low = 0.04
+			high = 0.065
+		elseif selection_index == PICKUP.SHOTGUN_HIGH_CAPACITY then
+			low = 0.06
+			high = 0.085
+		elseif selection_index == PICKUP.SNIPER_LOW_DAMAGE then
+			low = 0.06
+			high = 0.085
+		elseif selection_index == PICKUP.SNIPER_HIGH_DAMAGE then
+			low = 0.01
+			high = 0.02
+		else
+			low = 0.02
+			high = 0.045
+		end
+	elseif selection_index == PICKUP.AR_HIGH_CAPACITY then
 		low = 0.03
 		high = 0.055
 	elseif selection_index == PICKUP.AR_MED_CAPACITY then

@@ -108,7 +108,7 @@ function CriminalsManager:get_any_unit()
 	end
 end
 
-function CriminalsManager:get_valid_player_spawn_pos_rot()
+function CriminalsManager:get_valid_player_spawn_pos_rot(peer_id)
 	local server_unit = managers.network:session():local_peer():unit()
 
 	if alive(server_unit) then
@@ -273,6 +273,10 @@ function CriminalsManager:add_character(name, unit, peer_id, ai, ai_loadout)
 
 		if sequence and alive(unit) then
 			local unit_damage = unit:damage() or unit:camera() and unit:camera():camera_unit():damage()
+
+			if _G.IS_VR and unit:camera() then
+				unit_damage = nil
+			end
 
 			if unit_damage then
 				unit_damage:run_sequence_simple(sequence)

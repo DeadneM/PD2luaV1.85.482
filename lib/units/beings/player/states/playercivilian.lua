@@ -41,6 +41,15 @@ function PlayerCivilian:_enter(enter_data)
 	self._ext_network:send("set_stance", 1, false, false)
 
 	self._show_casing_t = Application:time() + 4
+
+	if _G.IS_VR then
+		managers.hud:belt():set_visible(false)
+
+		self._weapon_hand_id = self._unit:hand():get_active_hand_id("weapon")
+
+		self._unit:hand():set_default_state(PlayerHand.LEFT, "idle")
+		self._unit:hand():set_default_state(PlayerHand.RIGHT, "idle")
+	end
 end
 
 function PlayerCivilian:exit(state_data, new_state_name)
@@ -69,6 +78,11 @@ function PlayerCivilian:exit(state_data, new_state_name)
 		managers.groupai:state():remove_listener(self._enemy_weapons_hot_listen_id)
 
 		self._enemy_weapons_hot_listen_id = nil
+	end
+
+	if _G.IS_VR then
+		managers.hud:belt():set_visible(true)
+		self._unit:hand():set_default_state(self._weapon_hand_id or PlayerHand.hand_id(managers.vr:get_setting("default_weapon_hand") or "right"), "weapon")
 	end
 end
 
@@ -180,8 +194,6 @@ function PlayerCivilian:_update_interaction_timers(t)
 	if self._interact_expire_t then
 		local dt = self:_get_interaction_speed()
 		self._interact_expire_t = self._interact_expire_t - dt
-
-		print("self._interact_expire_t: ", self._interact_expire_t)
 
 		if not alive(self._interact_params.object) or self._interact_params.object ~= managers.interaction:active_unit() or self._interact_params.tweak_data ~= self._interact_params.object:interaction().tweak_data or self._interact_params.object:interaction():check_interupt() then
 			self:_interupt_action_interact(t)

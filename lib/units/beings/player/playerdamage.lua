@@ -304,7 +304,37 @@ function PlayerDamage:force_into_bleedout(can_activate_berserker)
 	self:_set_health_effect()
 end
 
+
+local function get_heartbeat_value(t)
+	local speed = 550
+	local val = math.sin(t * speed)
+
+	if val < 0 then
+		val = -math.clamp(math.sin(t * speed + speed / 5), -1, 0)
+	end
+
+	return val < 0.4 and 0 or val
+end
+
+
+function PlayerDamage:stop_vr_heartbeat()
+	self._heartbeat_t = nil
+end
+
 function PlayerDamage:update(unit, t, dt)
+	if _G.IS_VR and self._heartbeat_t and t < self._heartbeat_t then
+		local intensity_mul = 1 - (t - self._heartbeat_start_t) / (self._heartbeat_t - self._heartbeat_start_t)
+		local controller = self._unit:base():controller():get_controller("vr")
+
+		for i = 0, 1, 1 do
+			local intensity = get_heartbeat_value(t)
+			intensity = intensity * (1 - math.clamp(self:health_ratio() / 0.3, 0, 1))
+			intensity = intensity * intensity_mul
+
+			controller:trigger_haptic_pulse(i, 0, intensity * 900)
+		end
+	end
+
 	self:_check_update_max_health()
 	self:_check_update_max_armor()
 	self:_update_can_take_dmg_timer(dt)
@@ -431,7 +461,10 @@ function PlayerDamage:update(unit, t, dt)
 	if not self._downed_timer and self._downed_progression then
 		self._downed_progression = math.max(0, self._downed_progression - dt * 50)
 
-		managers.environment_controller:set_downed_value(self._downed_progression)
+		if not _G.IS_VR then
+			managers.environment_controller:set_downed_value(self._downed_progression)
+		end
+
 		SoundDevice:set_rtpc("downed_state_progression", self._downed_progression)
 
 		if self._downed_progression == 0 then
@@ -764,6 +797,11 @@ function PlayerDamage:set_health(health)
 		self._said_hurt = false
 	end
 
+	if self:health_ratio() < 0.3 then
+		self._heartbeat_start_t = TimerManager:game():time()
+		self._heartbeat_t = self._heartbeat_start_t + tweak_data.vr.heartbeat_time
+	end
+
 	managers.hud:set_player_health({
 		current = self:get_real_health(),
 		total = self:_max_health(),
@@ -995,7 +1033,10 @@ end
 function PlayerDamage:play_whizby(position)
 	self._unit:sound():play_whizby({position = position})
 	self._unit:camera():play_shaker("whizby", 0.1)
-	managers.rumble:play("bullet_whizby")
+
+	if not _G.IS_VR then
+		managers.rumble:play("bullet_whizby")
+	end
 end
 
 function PlayerDamage:clbk_kill_taunt(attack_data)
@@ -1108,7 +1149,11 @@ function PlayerDamage:damage_bullet(attack_data)
 	local shake_multiplier = math.clamp(attack_data.damage, 0.2, 2) * shake_armor_multiplier
 
 	self._unit:camera():play_shaker("player_bullet_damage", 1 * shake_multiplier)
-	managers.rumble:play("damage_bullet")
+
+	if not _G.IS_VR then
+		managers.rumble:play("damage_bullet")
+	end
+
 	self:_hit_direction(attack_data.attacker_unit:position())
 	pm:check_damage_carry(attack_data)
 
@@ -1573,7 +1618,10 @@ function PlayerDamage:update_downed(t, dt)
 			self._downed_progression = math.clamp(1 - self._downed_timer / self._downed_start_time, 0, 1) * 100
 		end
 
-		managers.environment_controller:set_downed_value(self._downed_progression)
+		if not _G.IS_VR then
+			managers.environment_controller:set_downed_value(self._downed_progression)
+		end
+
 		SoundDevice:set_rtpc("downed_state_progression", self._downed_progression)
 
 		return self._downed_timer <= 0

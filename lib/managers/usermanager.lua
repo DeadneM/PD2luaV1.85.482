@@ -134,6 +134,7 @@ function GenericUserManager:setup_setting_map()
 	self:setup_setting(84, "loading_screen_show_controller", true)
 	self:setup_setting(85, "loading_screen_show_hints", true)
 	self:setup_setting(86, "crimenet_filter_modded", true)
+	self:setup_setting(300, "adaptive_quality", true)
 end
 
 function GenericUserManager:setup_setting(id, name, default_value)
@@ -217,7 +218,8 @@ function GenericUserManager:reset_video_setting_map()
 		"video_ao",
 		"parallax_mapping",
 		"video_aa",
-		"corpse_limit"
+		"corpse_limit",
+		"adaptive_quality"
 	}
 
 	for _, name in pairs(settings) do
@@ -342,7 +344,7 @@ end
 function GenericUserManager:remove_setting_changed_callback(setting_name, callback_func)
 	local callback_handler = self._setting_changed_callback_handler_map[setting_name]
 
-	assert(Global.user_manager.setting_data_map[name], "[UserManager] Tried to remove setting changed callback for non-existing setting \"" .. tostring(setting_name) .. "\".")
+	assert(Global.user_manager.setting_data_map[setting_name], "[UserManager] Tried to remove setting changed callback for non-existing setting \"" .. tostring(setting_name) .. "\".")
 	assert(callback_handler, "[UserManager] Tried to remove non-existing setting changed callback for setting \"" .. tostring(setting_name) .. "\".")
 	callback_handler:remove(callback_func)
 end

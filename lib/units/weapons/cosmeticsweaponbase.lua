@@ -41,6 +41,8 @@ function NewRaycastWeaponBase:get_cosmetics_data()
 end
 
 function NewRaycastWeaponBase:_material_config_name(part_id, unit_name, use_cc_material_config, force_third_person)
+	force_third_person = force_third_person or _G.IS_VR
+
 	if self:is_npc() or force_third_person then
 		if use_cc_material_config and tweak_data.weapon.factory.parts[part_id].cc_thq_material_config then
 			return tweak_data.weapon.factory.parts[part_id].cc_thq_material_config
@@ -71,6 +73,7 @@ function NewRaycastWeaponBase:_update_materials()
 	local use = not self:is_npc() or self:use_thq()
 	local use_cc_material_config = use and self._cosmetics_data and true or false
 	local is_thq = self:is_npc() and self:use_thq()
+	is_thq = is_thq or not self:is_npc() and _G.IS_VR
 
 	if is_thq or use_cc_material_config then
 		if not self._materials then

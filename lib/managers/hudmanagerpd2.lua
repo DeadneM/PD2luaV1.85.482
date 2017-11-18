@@ -86,22 +86,24 @@ end
 function HUDManager:hide_player_gear(panel_id)
 	if self._teammate_panels[panel_id] and self._teammate_panels[panel_id]:panel() and self._teammate_panels[panel_id]:panel():child("player") then
 		local player_panel = self._teammate_panels[panel_id]:panel():child("player")
+		local teammate_panel = self._teammate_panels[panel_id]
 
 		player_panel:child("weapons_panel"):set_visible(false)
-		player_panel:child("deployable_equipment_panel"):set_visible(false)
-		player_panel:child("cable_ties_panel"):set_visible(false)
-		player_panel:child("grenades_panel"):set_visible(false)
+		teammate_panel._deployable_equipment_panel:set_visible(false)
+		teammate_panel._cable_ties_panel:set_visible(false)
+		teammate_panel._grenades_panel:set_visible(false)
 	end
 end
 
 function HUDManager:show_player_gear(panel_id)
 	if self._teammate_panels[panel_id] and self._teammate_panels[panel_id]:panel() and self._teammate_panels[panel_id]:panel():child("player") then
 		local player_panel = self._teammate_panels[panel_id]:panel():child("player")
+		local teammate_panel = self._teammate_panels[panel_id]
 
 		player_panel:child("weapons_panel"):set_visible(true)
-		player_panel:child("deployable_equipment_panel"):set_visible(true)
-		player_panel:child("cable_ties_panel"):set_visible(true)
-		player_panel:child("grenades_panel"):set_visible(true)
+		teammate_panel._deployable_equipment_panel:set_visible(true)
+		teammate_panel._cable_ties_panel:set_visible(true)
+		teammate_panel._grenades_panel:set_visible(true)
 	end
 end
 
@@ -821,9 +823,13 @@ function HUDManager:_create_teammates_panel(hud)
 		}
 		local pw = teammate_w + (is_player and 0 or 64)
 		local teammate = HUDTeammate:new(i, teammates_panel, is_player, pw)
-		local x = math.floor((pw + small_gap) * (i - 1) + (i == HUDManager.PLAYER_PANEL and player_gap or 0))
 
-		teammate._panel:set_x(math.floor(x))
+		if not _G.IS_VR then
+			local x = math.floor((pw + small_gap) * (i - 1) + (i == HUDManager.PLAYER_PANEL and player_gap or 0))
+
+			teammate._panel:set_x(math.floor(x))
+		end
+
 		table.insert(self._teammate_panels, teammate)
 	end
 end
@@ -1752,7 +1758,7 @@ end
 
 function HUDManager:setup_mission_briefing_hud()
 	local hud = managers.hud:script(IngameWaitingForPlayersState.GUI_FULLSCREEN)
-	self._hud_mission_briefing = HUDMissionBriefing:new(hud, self._fullscreen_workspace)
+	self._hud_mission_briefing = HUDMissionBriefing:new(hud, self:workspace("fullscreen_workspace", "menu"))
 end
 
 function HUDManager:hide_mission_briefing_hud()
@@ -1816,12 +1822,13 @@ function HUDManager:is_inside_mission_briefing_slot(peer_id, child, x, y)
 end
 
 function HUDManager:setup_endscreen_hud()
+	local ws = self:workspace("fullscreen_workspace", "menu")
 	local hud = managers.hud:script(MissionEndState.GUI_ENDSCREEN)
 
 	if game_state_machine:gamemode().id == GamemodeCrimeSpree.id then
-		self._hud_stage_endscreen = HUDStageEndCrimeSpreeScreen:new(hud, self._fullscreen_workspace)
+		self._hud_stage_endscreen = HUDStageEndCrimeSpreeScreen:new(hud, ws)
 	else
-		self._hud_stage_endscreen = HUDStageEndScreen:new(hud, self._fullscreen_workspace)
+		self._hud_stage_endscreen = HUDStageEndScreen:new(hud, ws)
 	end
 end
 
@@ -1893,7 +1900,7 @@ end
 
 function HUDManager:setup_lootscreen_hud()
 	local hud = managers.hud:script(IngameLobbyMenuState.GUI_LOOTSCREEN)
-	self._hud_lootscreen = HUDLootScreen:new(hud, self._fullscreen_workspace, self._saved_lootdrop, self._saved_selected, self._saved_card_chosen, self._saved_setup)
+	self._hud_lootscreen = HUDLootScreen:new(hud, self:workspace("fullscreen_workspace", "menu"), self._saved_lootdrop, self._saved_selected, self._saved_card_chosen, self._saved_setup)
 	self._saved_lootdrop = nil
 	self._saved_selected = nil
 	self._saved_card_chosen = nil
@@ -1997,6 +2004,11 @@ function HUDManager:set_ai_stopped(ai_id, stopped)
 	end
 
 	local panel = teammate_panel._panel
+
+	if not panel then
+		return
+	end
+
 	local name = panel:child("name") and string.gsub(panel:child("name"):text(), "%W", "")
 	local label = nil
 
@@ -2084,5 +2096,21 @@ function HUDManager:safe_house_challenge_popup(id, c_type)
 	if not d.hidden_in_list then
 		HudChallangeNotification.queue(managers.localization:to_upper_text(title_id), managers.localization:to_upper_text(d.name_id))
 	end
+end
+
+function HUDManager:register_ingame_workspace(name, obj)
+	self._ingame_workspaces = self._ingame_workspaces or {}
+
+	managers.gui_data:add_workspace_object(name, obj)
+
+	self._ingame_workspaces[name] = managers.gui_data:create_fullscreen_workspace(name, World:gui())
+
+	if self["on_workspace_created_" .. name] then
+		self["on_workspace_created_" .. name](self, self._ingame_workspaces[name])
+	end
+end
+
+function HUDManager:ingame_workspace(name)
+	return self._ingame_workspaces and self._ingame_workspaces[name]
 end
 

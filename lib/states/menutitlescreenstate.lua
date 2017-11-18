@@ -96,6 +96,10 @@ function MenuTitlescreenState:_update_pc_xbox_controller_connection(params)
 end
 
 function MenuTitlescreenState:at_enter()
+	if _G.IS_VR and Global.join_host then
+		managers.vr:force_start_loading()
+	end
+
 	if not self._controller_list then
 		self:setup()
 		Application:stack_dump_error("Shouldn't enter title more than once. Except when toggling freeflight.")
@@ -183,6 +187,16 @@ function MenuTitlescreenState:update(t, dt)
 end
 
 function MenuTitlescreenState:get_start_pressed_controller_index()
+	if _G.IS_VR then
+		for index, controller in ipairs(self._controller_list) do
+			if controller._default_controller_id == "vr" and controller:get_any_input_pressed() then
+				return index
+			end
+		end
+
+		return nil
+	end
+
 	for index, controller in ipairs(self._controller_list) do
 		if is_ps4 or is_xb1 then
 			if controller:get_input_pressed("confirm") then

@@ -17,6 +17,14 @@ local function make_fine_text(text)
 	text:set_position(math.round(text:x()), math.round(text:y()))
 end
 
+
+local function fit_text_height(text_gui)
+	local _, y, _, h = text_gui:text_rect()
+
+	text_gui:set_h(h)
+	text_gui:set_y(math.round(text_gui:y()))
+end
+
 SkillTreeItem = SkillTreeItem or class()
 
 function SkillTreeItem:init()
@@ -1579,6 +1587,19 @@ function SkillTreeGui:_setup(add_skilltree, add_specialization)
 			font_size = tweak_data.menu.pd2_small_font_size,
 			color = tweak_data.screen_colors.text
 		})
+
+		if _G.IS_VR then
+			self._spec_description_issue = spec_description_panel:text({
+				text = "",
+				halign = "grow",
+				blend_mode = "normal",
+				visible = false,
+				valign = "grow",
+				font = tweak_data.menu.pd2_small_font,
+				font_size = tweak_data.menu.pd2_small_font_size,
+				color = tweak_data.screen_colors.important_1
+			})
+		end
 	end
 
 	self:show_btns()
@@ -2016,6 +2037,25 @@ function SkillTreeGui:update_spec_descriptions(item)
 	self._spec_description_text:set_y(self._spec_description_locked:y() + h + 10)
 
 	local x, y, w, h = self._spec_description_text:text_rect()
+
+	if _G.IS_VR then
+		local tweak = item.tier and tweak_data.vr:is_locked("perks", item:tree(), item:tier())
+
+		if tweak then
+			self._spec_description_issue:set_y(self._spec_description_text:y() + h + 10)
+
+			local version_string = managers.localization:text("bm_menu_vr_skill_perk")
+			local effect_string = managers.localization:text("bm_menu_vr_effect_" .. tweak.effect, {version = version_string})
+
+			self._spec_description_issue:set_text(effect_string)
+			self._spec_description_issue:show()
+			fit_text_height(self._spec_description_issue)
+
+			h = h + self._spec_description_issue:h() + 10
+		else
+			self._spec_description_issue:hide()
+		end
+	end
 
 	self._spec_description_progress:set_y(self._spec_description_text:y() + h + 10)
 end
@@ -4176,6 +4216,23 @@ function SpecializationTierItem:init(tier_data, tree_panel, tree, tier, x, y, w,
 	self._inside_panel = self._select_box_panel:panel({})
 
 	self._inside_panel:set_shape(6, 6, w - 12, h - 12)
+
+	if _G.IS_VR then
+		local tweak = tweak_data.vr:is_locked("perks", self._tree, self._tier)
+
+		if tweak then
+			local vr_issue_text = tree_panel:parent():text({
+				font_size = 16,
+				text_id = "menu_vr",
+				font = small_font,
+				color = tweak_data.screen_colors.important_1
+			})
+
+			make_fine_text(vr_issue_text)
+			vr_issue_text:set_world_bottom(self._inside_panel:world_bottom())
+			vr_issue_text:set_world_right(self._inside_panel:world_right())
+		end
+	end
 
 	self._select_box = BoxGuiObject:new(self._select_box_panel, {sides = {
 		1,

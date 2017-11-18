@@ -69,6 +69,8 @@ end
 
 function PlayerTweakData:init()
 	local is_console = SystemInfo:platform() ~= Idstring("WIN32")
+	local is_vr = false
+	is_vr = _G.IS_VR
 	self.arrest = {
 		aggression_timeout = 60,
 		arrest_timeout = 240
@@ -100,7 +102,13 @@ function PlayerTweakData:init()
 		0.98,
 		0.99
 	}
-	self.damage.HEALTH_INIT = 23
+
+	if is_vr then
+		self.damage.HEALTH_INIT = 28
+	else
+		self.damage.HEALTH_INIT = 23
+	end
+
 	self.damage.LIVES_INIT = 4
 
 	if is_console then

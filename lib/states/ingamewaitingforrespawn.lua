@@ -57,20 +57,31 @@ function IngameWaitingForRespawnState:_setup_camera()
 	self._camera_object:set_far_range(1000000)
 	self._camera_object:set_fov(75)
 
-	self._viewport = managers.viewport:new_vp(0, 0, 1, 1, "spectator", CoreManagerBase.PRIO_WORLDCAMERA)
+	if _G.IS_VR then
+		self._camera_object:set_stereo(false)
+		managers.menu:set_override_ingame_camera(self._camera_object)
+	else
+		self._viewport = managers.viewport:new_vp(0, 0, 1, 1, "spectator", CoreManagerBase.PRIO_WORLDCAMERA)
 
-	self._viewport:set_camera(self._camera_object)
-	self._viewport:set_active(true)
+		self._viewport:set_camera(self._camera_object)
+		self._viewport:set_active(true)
+	end
 end
 
 function IngameWaitingForRespawnState:_clear_camera()
-	self._viewport:destroy()
+	if self._viewport then
+		self._viewport:destroy()
 
-	self._viewport = nil
+		self._viewport = nil
+	end
 
 	World:delete_camera(self._camera_object)
 
 	self._camera_object = nil
+
+	if _G.IS_VR then
+		managers.menu:set_override_ingame_camera(nil)
+	end
 end
 
 function IngameWaitingForRespawnState:_setup_sound_listener()
@@ -126,7 +137,8 @@ function IngameWaitingForRespawnState.request_player_spawn(peer_to_spawn)
 	if Network:is_client() then
 		managers.network:session():server_peer():send("request_spawn_member")
 	else
-		local pos_rot = managers.criminals:get_valid_player_spawn_pos_rot()
+		local peer = managers.network:session():peer(peer_to_spawn)
+		local pos_rot = managers.criminals:get_valid_player_spawn_pos_rot(peer and peer:id())
 
 		if not pos_rot and managers.network then
 			local spawn_point = managers.network:session() and managers.network:session():get_next_spawn_point() or managers.network:spawn_point(1)
@@ -369,6 +381,10 @@ function IngameWaitingForRespawnState:_upd_watch(t, dt)
 end
 
 function IngameWaitingForRespawnState:at_enter()
+	if _G.IS_VR then
+		managers.menu:open_menu("custody")
+	end
+
 	managers.player:force_drop_carry()
 	managers.hud:set_player_health({
 		total = 100,
@@ -446,6 +462,10 @@ function IngameWaitingForRespawnState:at_enter()
 end
 
 function IngameWaitingForRespawnState:at_exit()
+	if _G.IS_VR then
+		managers.menu:close_menu("custody")
+	end
+
 	if self.music_on_death then
 		managers.music:track_listen_stop()
 

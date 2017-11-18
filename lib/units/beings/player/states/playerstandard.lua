@@ -119,7 +119,7 @@ function PlayerStandard:init(unit)
 	self._on_melee_restart_drill = pm:has_category_upgrade("player", "drill_melee_hit_restart_chance")
 	local controller = unit:base():controller()
 
-	if controller:get_type() ~= "pc" then
+	if controller:get_type() ~= "pc" and controller:get_type() ~= "vr" then
 		self._input = {}
 
 		table.insert(self._input, BipodDeployControllerInput:new())
@@ -184,7 +184,7 @@ function PlayerStandard:enter(state_data, enter_data)
 		self:_activate_mover(PlayerStandard.MOVER_STAND)
 	end
 
-	if (enter_data and enter_data.wants_crouch or not self:_can_stand()) and not self._state_data.ducking then
+	if not _G.IS_VR and (enter_data and enter_data.wants_crouch or not self:_can_stand()) and not self._state_data.ducking then
 		self:_start_action_ducking(managers.player:player_timer():time())
 	end
 
@@ -725,15 +725,7 @@ function PlayerStandard:_update_check_actions(t, dt, paused)
 	new_action = new_action or self:_check_action_melee(t, input)
 	new_action = new_action or self:_check_action_reload(t, input)
 	new_action = new_action or self:_check_change_weapon(t, input)
-
-	if not new_action then
-		new_action = self:_check_action_primary_attack(t, input)
-
-		if not new_action then
-			self:_check_stop_shooting()
-		end
-	end
-
+	new_action = new_action or self:_check_action_primary_attack(t, input)
 	new_action = new_action or self:_check_action_equip(t, input)
 	new_action = new_action or self:_check_use_item(t, input)
 	new_action = new_action or self:_check_action_throw_projectile(t, input)
@@ -1730,23 +1722,29 @@ function PlayerStandard:_check_action_interact(t, input)
 	local keyboard = self._controller.TYPE == "pc" or managers.controller:get_default_wrapper_type() == "pc"
 	local new_action, timer, interact_object = nil
 
-	if input.btn_interact_press and not self:_action_interact_forbidden() then
-		new_action, timer, interact_object = self._interaction:interact(self._unit, input.data)
-
-		if new_action then
-			self:_play_interact_redirect(t, input)
+	if input.btn_interact_press then
+		if _G.IS_VR then
+			self._interact_hand = input.btn_interact_left_press and PlayerHand.LEFT or PlayerHand.RIGHT
 		end
 
-		if timer then
-			new_action = true
+		if not self:_action_interact_forbidden() then
+			new_action, timer, interact_object = self._interaction:interact(self._unit, input.data, self._interact_hand)
 
-			self._ext_camera:camera_unit():base():set_limits(80, 50)
-			self:_start_action_interact(t, input, timer, interact_object)
-		end
+			if new_action then
+				self:_play_interact_redirect(t, input)
+			end
 
-		if not new_action then
-			self._start_intimidate = true
-			self._start_intimidate_t = t
+			if timer then
+				new_action = true
+
+				self._ext_camera:camera_unit():base():set_limits(80, 50)
+				self:_start_action_interact(t, input, timer, interact_object)
+			end
+
+			if not new_action then
+				self._start_intimidate = true
+				self._start_intimidate_t = t
+			end
 		end
 	end
 
@@ -1758,14 +1756,23 @@ function PlayerStandard:_check_action_interact(t, input)
 	end
 
 	if input.btn_interact_release then
-		if self._start_intimidate and not self:_action_interact_forbidden() then
-			if t < self._start_intimidate_t + secondary_delay then
-				self:_start_action_intimidate(t)
+		local released = true
 
-				self._start_intimidate = false
+		if _G.IS_VR then
+			local release_hand = input.btn_interact_left_release and PlayerHand.LEFT or PlayerHand.RIGHT
+			released = release_hand == self._interact_hand
+		end
+
+		if released then
+			if self._start_intimidate and not self:_action_interact_forbidden() then
+				if t < self._start_intimidate_t + secondary_delay then
+					self:_start_action_intimidate(t)
+
+					self._start_intimidate = false
+				end
+			else
+				self:_interupt_action_interact()
 			end
-		else
-			self:_interupt_action_interact()
 		end
 	end
 
@@ -2154,8 +2161,8 @@ function PlayerStandard:_calc_melee_hit_ray(t, sphere_cast_radius)
 	return self._unit:raycast("ray", from, to, "slot_mask", self._slotmask_bullet_impact_targets, "sphere_cast_radius", sphere_cast_radius, "ray_type", "body melee")
 end
 
-function PlayerStandard:_do_melee_damage(t, bayonet_melee, melee_hit_ray)
-	local melee_entry = managers.blackmarket:equipped_melee_weapon()
+function PlayerStandard:_do_melee_damage(t, bayonet_melee, melee_hit_ray, melee_entry)
+	melee_entry = melee_entry or managers.blackmarket:equipped_melee_weapon()
 	local instant_hit = tweak_data.blackmarket.melee_weapons[melee_entry].instant
 	local melee_damage_delay = tweak_data.blackmarket.melee_weapons[melee_entry].melee_damage_delay or 0
 	local charge_lerp_value = instant_hit and 0 or self:_get_melee_charge_lerp_value(t, melee_damage_delay)
@@ -2220,7 +2227,18 @@ function PlayerStandard:_do_melee_damage(t, bayonet_melee, melee_hit_ray)
 			})
 		end
 
-		managers.rumble:play("melee_hit")
+		local custom_data = nil
+
+		if _G.IS_VR then
+			local melee_hand_id = self._unit:hand():get_active_hand_id("melee")
+			melee_hand_id = melee_hand_id or self._unit:hand():get_active_hand_id("weapon")
+
+			if melee_hand_id then
+				custom_data = {engine = melee_hand_id == 1 and "right" or "left"}
+			end
+		end
+
+		managers.rumble:play("melee_hit", nil, nil, custom_data)
 		managers.game_play_central:physics_push(col_ray)
 
 		local character_unit, shield_knock = nil
@@ -2276,6 +2294,10 @@ function PlayerStandard:_do_melee_damage(t, bayonet_melee, melee_hit_ray)
 
 			if special_weapon == "taser" then
 				action_data.variant = "taser_tased"
+			end
+
+			if _G.IS_VR and melee_entry == "weapon" and not bayonet_melee then
+				dmg_multiplier = 0
 			end
 
 			action_data.damage = shield_knock and 0 or damage * dmg_multiplier
@@ -2970,6 +2992,13 @@ function PlayerStandard:_get_unit_intimidation_action(intimidate_enemies, intimi
 	local unit_type_turret = 4
 	local cam_fwd = self._ext_camera:forward()
 	local my_head_pos = self._ext_movement:m_head_pos()
+
+	if _G.IS_VR then
+		local hand_unit = self._unit:hand():hand_unit(self._interact_hand)
+		cam_fwd = hand_unit:rotation():y()
+		my_head_pos = hand_unit:position()
+	end
+
 	local spotting_mul = managers.player:upgrade_value("player", "marked_distance_mul", 1)
 	local range_mul = managers.player:upgrade_value("player", "intimidate_range_mul", 1) * managers.player:upgrade_value("player", "passive_intimidate_range_mul", 1)
 	local intimidate_range_civ = tweak_data.player.long_dis_interaction.intimidate_range_civilians * range_mul
@@ -3221,6 +3250,10 @@ function PlayerStandard:_do_action_intimidate(t, interact_type, sound_name, skip
 		self._intimidate_t = t
 
 		self:say_line(sound_name, skip_alert)
+
+		if _G.IS_VR then
+			self._unit:hand():intimidate(self._interact_hand)
+		end
 
 		if interact_type and not self:_is_using_bipod() then
 			self:_play_distance_interact_redirect(t, interact_type)
@@ -4053,6 +4086,8 @@ function PlayerStandard:_check_action_primary_attack(t, input)
 								end
 							end
 						else
+							self:_check_stop_shooting()
+
 							return false
 						end
 					end
@@ -4658,6 +4693,14 @@ function PlayerStandard:pre_destroy()
 end
 
 function PlayerStandard:tweak_data_clbk_reload()
-	self._tweak_data = tweak_data.player.movement_state.standard
+	local state_name = self._ext_movement:current_state_name()
+
+	if state_name == "jerry1" then
+		self._tweak_data = tweak_data.player.freefall
+	elseif state_name == "jerry2" then
+		self._tweak_data = tweak_data.player.parachute
+	else
+		self._tweak_data = tweak_data.player.movement_state.standard
+	end
 end
 

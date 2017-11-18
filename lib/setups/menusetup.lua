@@ -21,6 +21,98 @@ require("lib/units/weapons/WeaponUnderbarrel")
 require("lib/units/weapons/WeaponUnderbarrelLauncher")
 require("lib/units/menu/MenuArmourBase")
 require("lib/units/ArmorSkinExt")
+require("lib/managers/EnvironmentEffectsManager")
+
+IngameUIExt = IngameUIExt or class()
+
+function IngameUIExt:init(unit)
+end
+
+function IngameUIExt:set_active(unit)
+end
+AIAttentionObject = AIAttentionObject or class()
+
+function AIAttentionObject:init(unit)
+end
+
+function AIAttentionObject:set_active()
+end
+UseInteractionExt = UseInteractionExt or class()
+
+function UseInteractionExt:init(unit)
+end
+
+function UseInteractionExt:set_active()
+end
+SecurityCamera = SecurityCamera or class()
+
+function SecurityCamera:init(unit)
+end
+SecurityCameraInteractionExt = SecurityCameraInteractionExt or class()
+
+function SecurityCameraInteractionExt:init(unit)
+end
+
+function SecurityCameraInteractionExt:set_active()
+end
+ContourExt = ContourExt or class()
+
+function ContourExt:init(unit)
+end
+
+function ContourExt:set_active()
+end
+SyncUnitData = SyncUnitData or class()
+
+function SyncUnitData:init(unit)
+end
+
+function SyncUnitData:set_active()
+end
+AccessWeaponMenuInteractionExt = AccessWeaponMenuInteractionExt or class()
+
+function AccessWeaponMenuInteractionExt:init(unit)
+end
+
+function AccessWeaponMenuInteractionExt:set_active()
+end
+NetworkBaseExtension = NetworkBaseExtension or class()
+
+function NetworkBaseExtension:init(unit)
+end
+
+function NetworkBaseExtension:set_active()
+end
+DrivingInteractionExt = DrivingInteractionExt or class()
+
+function DrivingInteractionExt:init(unit)
+end
+
+function DrivingInteractionExt:set_active()
+end
+VehicleDamage = VehicleDamage or class()
+
+function VehicleDamage:init(unit)
+end
+
+function VehicleDamage:set_active()
+end
+CarryData = CarryData or class()
+
+function CarryData:init(unit)
+end
+
+function CarryData:set_active()
+end
+VehicleDrivingExt = VehicleDrivingExt or class()
+
+function VehicleDrivingExt:init(unit)
+end
+VehicleCamera = VehicleCamera or class()
+
+function VehicleCamera:init(unit)
+end
+
 require("lib/wip")
 core:import("SequenceManager")
 
@@ -40,6 +132,14 @@ function MenuSetup:load_packages()
 
 	if not PackageManager:loaded("packages/load_default") then
 		PackageManager:load("packages/load_default")
+	end
+
+	if not PackageManager:loaded("packages/vr_base") then
+		PackageManager:load("packages/vr_base")
+	end
+
+	if not PackageManager:loaded("packages/vr_menu") then
+		PackageManager:load("packages/vr_menu")
 	end
 
 	local prefix = "packages/dlcs/"
@@ -114,6 +214,10 @@ function MenuSetup:unload_packages()
 	if PackageManager:loaded("packages/start_menu") then
 		PackageManager:unload("packages/start_menu")
 	end
+
+	if PackageManager:loaded("packages/vr_menu") then
+		PackageManager:unload("packages/vr_menu")
+	end
 end
 
 function MenuSetup:init_game()
@@ -152,9 +256,11 @@ function MenuSetup:init_game()
 					world_setting = arg_list[i + 1]
 					i = i + 1
 				elseif arg == "-skip_intro" then
-					game_state_machine:set_boot_intro_done(true)
+					if not _G.IS_VR then
+						game_state_machine:set_boot_intro_done(true)
 
-					intro_skipped = true
+						intro_skipped = true
+					end
 				elseif arg == "+connect_lobby" then
 					Global.boot_invite = arg_list[i + 1]
 				elseif arg == "-auto_enter_level" then

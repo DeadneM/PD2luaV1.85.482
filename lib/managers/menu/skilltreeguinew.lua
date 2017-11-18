@@ -8,6 +8,14 @@ local function make_fine_text(text_gui)
 	text_gui:set_position(math.round(text_gui:x()), math.round(text_gui:y()))
 end
 
+
+local function fit_text_height(text_gui)
+	local _, y, _, h = text_gui:text_rect()
+
+	text_gui:set_h(h)
+	text_gui:set_y(math.round(text_gui:y()))
+end
+
 local massive_font = tweak_data.menu.pd2_massive_font
 local large_font = tweak_data.menu.pd2_large_font
 local medium_font = tweak_data.menu.pd2_medium_font
@@ -258,6 +266,21 @@ function NewSkillTreeGui:_setup()
 
 	description_text:grow(-PADDING, -PADDING)
 	description_text:move(PADDING / 2, PADDING / 2)
+
+	if _G.IS_VR then
+		local issue_text = description_panel:text({
+			text = "",
+			name = "IssueText",
+			blend_mode = "add",
+			font = small_font,
+			font_size = small_font_size,
+			color = tweak_data.screen_colors.important_1
+		})
+
+		issue_text:set_top(description_text:bottom())
+		issue_text:move(PADDING / 2, PADDING / 2)
+		issue_text:hide()
+	end
 
 	self._tab_items = {}
 	self._tree_items = {}
@@ -659,6 +682,24 @@ function NewSkillTreeGui:_update_description(item)
 		text:set_font_size(small_font_size * 0.95)
 	else
 		text:set_font_size(small_font_size)
+	end
+
+	if _G.IS_VR then
+		fit_text_height(text)
+
+		local issue_text = desc_panel:child("IssueText")
+		local tweak = tweak_data.vr:is_locked("skills", skill_id)
+
+		if tweak then
+			local version_string = managers.localization:text("bm_menu_vr_skill_" .. tweak.version)
+			local effect_string = managers.localization:text("bm_menu_vr_effect_" .. tweak.effect, {version = version_string})
+
+			issue_text:set_text(effect_string)
+			issue_text:set_top(text:bottom() + PADDING)
+			issue_text:show()
+		else
+			issue_text:hide()
+		end
 	end
 end
 
@@ -2410,6 +2451,24 @@ function NewSkillTreeSkillItem:init(skill_id, skill_data, skill_panel, tree_pane
 
 	skill_icon_panel:set_center_x(skill_panel:w() / 2)
 	skill_icon_panel:set_top(PADDING)
+
+	if _G.IS_VR then
+		local tweak = tweak_data.vr:is_locked("skills", self._skill_id)
+
+		if tweak then
+			local vr_issue_text = skill_icon_panel:text({
+				font_size = 16,
+				text_id = "menu_vr",
+				font = small_font,
+				color = tweak_data.screen_colors.important_1
+			})
+
+			make_fine_text(vr_issue_text)
+			vr_issue_text:set_bottom(skill_icon_panel:h())
+			vr_issue_text:set_right(skill_icon_panel:w())
+		end
+	end
+
 	skill_text:set_center_x(skill_icon_panel:center_x())
 	skill_text:set_top(skill_icon_panel:bottom())
 

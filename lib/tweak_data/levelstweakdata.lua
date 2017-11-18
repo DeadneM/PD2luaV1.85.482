@@ -1596,6 +1596,32 @@ function LevelsTweakData:init()
 		ai_group_type = america,
 		drop_pickups_to_ground = true
 	}
+	self.lbe_lobby = {
+		name_id = "heist_lbe_lobby_hl",
+		briefing_id = "heist_lbe_lobby_briefing",
+		package = "packages/load_default",
+		briefing_dialog = "Play_pln_firestarter_stage3_brief",
+		world_name = "wip/lbe_lobby",
+		intro_event = {"lol"},
+		outro_event = "Play_pln_branchbank_stage1_end",
+		music = "heist",
+		cube = "cube_apply_heist_bank",
+		max_bags = 1000,
+		ai_group_type = america
+	}
+	self.lbe_lobby_end = {
+		name_id = "heist_lbe_lobby_end_hl",
+		briefing_id = "heist_lbe_lobby_end_briefing",
+		package = "packages/load_default",
+		briefing_dialog = "Play_pln_firestarter_stage3_brief",
+		world_name = "wip/lbe_lobby",
+		intro_event = {"lol"},
+		outro_event = "Play_pln_branchbank_stage1_end",
+		music = "heist",
+		cube = "cube_apply_heist_bank",
+		max_bags = 1000,
+		ai_group_type = america
+	}
 	self._level_index = {
 		"welcome_to_the_jungle_1",
 		"welcome_to_the_jungle_1_night",
@@ -1694,7 +1720,9 @@ function LevelsTweakData:init()
 		"glace",
 		"dah",
 		"hvh",
-		"wwh"
+		"wwh",
+		"lbe_lobby",
+		"lbe_lobby_end"
 	}
 
 	if SystemInfo:distribution() == Idstring("STEAM") then
@@ -1715,7 +1743,8 @@ function LevelsTweakData:init()
 		"escape_hell",
 		"blueharvest_3",
 		"driving_escapes_industry_day",
-		"driving_escapes_city_day"
+		"driving_escapes_city_day",
+		"lbe_lobby_end"
 	}
 end
 

@@ -23,6 +23,7 @@ function BlackMarketManager:_setup()
 		preferred_character = "russian",
 		grenade = "frag",
 		melee_weapon = "weapon",
+		melee_weapon = _G.IS_VR and "fists",
 		henchman = {mask = "character_locked"}
 	}
 
@@ -154,6 +155,10 @@ function BlackMarketManager:_setup_melee_weapons()
 		local is_default, weapon_level = managers.upgrades:get_value(melee_weapon, self._defaults.melee_weapon)
 		melee_weapons[melee_weapon].level = weapon_level
 		melee_weapons[melee_weapon].skill_based = not is_default and weapon_level == 0 and not tweak_data.blackmarket.melee_weapons[melee_weapon].dlc
+
+		if _G.IS_VR then
+			melee_weapons[melee_weapon].vr_locked = tweak_data.vr:is_locked("melee_weapons", melee_weapon)
+		end
 	end
 
 	melee_weapons[self._defaults.melee_weapon].equipped = true
@@ -280,6 +285,10 @@ function BlackMarketManager:_setup_weapons()
 			weapons[weapon].level = weapon_level
 			weapons[weapon].skill_based = got_parent or not is_default and weapon_level == 0 and not tweak_data.weapon[weapon].global_value
 			weapons[weapon].func_based = tweak_data.weapon[weapon].unlock_func
+
+			if _G.IS_VR then
+				weapons[weapon].vr_locked = tweak_data.vr:is_locked("weapons", weapon)
+			end
 		end
 	end
 end
@@ -313,6 +322,10 @@ function BlackMarketManager:weapon_unlocked_by_crafted(category, slot)
 	local cosmetic_blueprint = cosmetics and cosmetics.id and tweak_data.blackmarket.weapon_skins[cosmetics.id] and tweak_data.blackmarket.weapon_skins[cosmetics.id].default_blueprint or {}
 	local data = Global.blackmarket_manager.weapons[weapon_id]
 	local unlocked = data.unlocked
+
+	if _G.IS_VR then
+		unlocked = unlocked and not data.vr_locked
+	end
 
 	if unlocked then
 		local is_any_part_dlc_locked = false
@@ -497,6 +510,14 @@ function BlackMarketManager:equipped_grenade_allows_pickups()
 	local grenade_tweak = id and tweak_data.blackmarket.projectiles[id]
 
 	return grenade_tweak and not grenade_tweak.base_cooldown
+end
+
+function BlackMarketManager:has_equipped_ability()
+	local id = self:equipped_grenade()
+
+	if id then
+		return tweak_data.blackmarket.projectiles[id] and tweak_data.blackmarket.projectiles[id].ability and true or false
+	end
 end
 
 function BlackMarketManager:equipped_grenade()
@@ -3575,6 +3596,10 @@ function BlackMarketManager:get_sorted_melee_weapons(hide_locked)
 		x_td = m_tweak_data[x[1]]
 		y_td = m_tweak_data[y[1]]
 
+		if _G.IS_VR and xd.vr_locked ~= yd.vr_locked then
+			return not xd.vr_locked
+		end
+
 		if xd.unlocked ~= yd.unlocked then
 			return xd.unlocked
 		end
@@ -4101,6 +4126,10 @@ function BlackMarketManager:equip_next_character()
 end
 
 function BlackMarketManager:on_aquired_weapon_platform(upgrade, id, loading)
+	if _G.IS_VR and tweak_data.vr:is_locked("weapons", id) then
+		return
+	end
+
 	self._global.weapons[id].unlocked = true
 	local category = tweak_data.weapon[upgrade.weapon_id].use_data.selection_index == 2 and "primaries" or "secondaries"
 
@@ -4145,6 +4174,10 @@ function BlackMarketManager:on_aquired_melee_weapon(upgrade, id, loading)
 	if not self._global.melee_weapons[id] then
 		Application:error("[BlackMarketManager:on_aquired_melee_weapon] Melee weapon do not exist in blackmarket", "melee_weapon_id", id)
 
+		return
+	end
+
+	if _G.IS_VR and tweak_data.vr:is_locked("melee_weapons", id) then
 		return
 	end
 
@@ -7438,23 +7471,27 @@ function BlackMarketManager:_cleanup_blackmarket()
 						end
 					end
 
-					if default_mod then
-						table.insert(invalid_parts, {
-							global_value = "normal",
-							refund = false,
-							reason = "duplicate part (default)",
-							slot = slot,
-							default_mod = default_mod,
-							part_id = part_id
-						})
-					else
-						table.insert(invalid_parts, {
-							refund = true,
-							reason = "duplicate part",
-							slot = slot,
-							global_value = item.global_values[part_id] or "normal",
-							part_id = part_id
-						})
+					local remove_part = true
+
+					if remove_part then
+						if default_mod then
+							table.insert(invalid_parts, {
+								global_value = "normal",
+								refund = false,
+								reason = "duplicate part (default)",
+								slot = slot,
+								default_mod = default_mod,
+								part_id = part_id
+							})
+						else
+							table.insert(invalid_parts, {
+								refund = true,
+								reason = "duplicate part",
+								slot = slot,
+								global_value = item.global_values[part_id] or "normal",
+								part_id = part_id
+							})
+						end
 					end
 				end
 
@@ -7998,7 +8035,7 @@ function BlackMarketManager:_verfify_equipped_category(category)
 		for melee_weapon, craft in pairs(Global.blackmarket_manager.melee_weapons) do
 			local melee_weapon_data = tweak_data.blackmarket.melee_weapons[melee_weapon] or {}
 
-			if craft.equipped and craft.unlocked and (not melee_weapon_data.dlc or managers.dlc:is_dlc_unlocked(melee_weapon_data.dlc)) then
+			if craft.equipped and craft.unlocked and (not melee_weapon_data.dlc or managers.dlc:is_dlc_unlocked(melee_weapon_data.dlc)) and (not _G.IS_VR or not craft.vr_locked) then
 				melee_weapon_id = melee_weapon
 			end
 		end
@@ -8526,7 +8563,7 @@ function BlackMarketManager:player_owns_silenced_weapon()
 	return false
 end
 
-function BlackMarketManager:equip_weapon_in_game(category, slot)
+function BlackMarketManager:equip_weapon_in_game(category, slot, force_equip, done_cb)
 	if managers.job:current_real_job_id() ~= "chill" then
 		Application:error("[BlackMarketManager:equip_weapon_in_game] feature not available outside safehouse")
 
@@ -8556,14 +8593,14 @@ function BlackMarketManager:equip_weapon_in_game(category, slot)
 			first_time = false
 		end
 
-		if not managers.network:session():local_peer():is_outfit_loaded() then
-			return false
-		end
-
 		local weapon = self._global.crafted_items[category][slot]
 		local texture_switches = managers.blackmarket:get_weapon_texture_switches(category, slot, weapon)
 
-		managers.player:player_unit():inventory():add_unit_by_factory_name(weapon.factory_id, true, false, weapon.blueprint, weapon.cosmetics, texture_switches)
+		managers.player:player_unit():inventory():add_unit_by_factory_name(weapon.factory_id, false, false, weapon.blueprint, weapon.cosmetics, texture_switches)
+
+		if done_cb then
+			done_cb()
+		end
 
 		return true
 	end
@@ -8575,10 +8612,21 @@ function BlackMarketManager:equip_weapon_in_game(category, slot)
 		managers.dyn_resource:load(Idstring("unit"), ids_unit_name, managers.dyn_resource.DYN_RESOURCES_PACKAGE, nil)
 	end
 
-	managers.player:player_unit():movement():current_state():_start_action_unequip_weapon(TimerManager:game():time(), {
-		selection_wanted = primary and 2 or 1,
-		unequip_callback = clbk
-	})
+	local selection_categories = {
+		"secondaries",
+		"primaries"
+	}
+	local should_equip = selection_categories[managers.player:player_unit():inventory():equipped_selection()] == category or force_equip
+	should_equip = should_equip and not _G.IS_VR
+
+	if should_equip then
+		managers.player:player_unit():movement():current_state():_start_action_unequip_weapon(TimerManager:game():time(), {
+			selection_wanted = primary and 2 or 1,
+			unequip_callback = clbk
+		})
+	else
+		managers.network:session():local_peer():add_outfit_loaded_clbk(clbk)
+	end
 end
 
 function BlackMarketManager:get_reload_time(weapon_id)
@@ -8819,6 +8867,20 @@ end
 
 function BlackMarketManager:has_unlocked_arbiter()
 	return managers.tango:has_unlocked_arbiter()
+end
+
+function BlackMarketManager:get_type_by_id(id)
+	for key, data in pairs(self._global) do
+		if type(data) == "table" and data[id] then
+			return key
+		end
+	end
+
+	for key, data in pairs(tweak_data.blackmarket) do
+		if type(data) == "table" and data[id] then
+			return key
+		end
+	end
 end
 
 function BlackMarketManager:has_unlocked_breech()

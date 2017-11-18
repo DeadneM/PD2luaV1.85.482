@@ -30,6 +30,7 @@ function WorldDefinition:init(params)
 
 	self:_parse_world_setting(params.world_setting)
 
+	self._force_networked_units = params.force_networked_units
 	self._blacklist_data = {}
 
 	self:_load_blacklist()
@@ -967,7 +968,7 @@ function WorldDefinition:make_unit(data, offset)
 		return nil
 	end
 
-	if not is_editor and not Network:is_server() then
+	if not is_editor and not Network:is_server() and not self._force_networked_units then
 		local network_sync = PackageManager:unit_data(name:id()):network_sync()
 
 		if network_sync ~= "none" and network_sync ~= "client" then

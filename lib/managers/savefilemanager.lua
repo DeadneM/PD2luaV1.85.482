@@ -13,6 +13,13 @@ if SystemInfo:platform() == Idstring("X360") then
 	SavefileManager.TASK_MIN_DURATION = 3
 end
 
+if _G.IS_VR then
+	SavefileManager.SETTING_SLOT = 12
+end
+
+SavefileManager.AUTO_SAVE_SLOT = 13
+SavefileManager.PROGRESS_SLOT = 96
+SavefileManager.BACKUP_SLOT = 96
 SavefileManager.IDLE_TASK_TYPE = 1
 SavefileManager.LOAD_TASK_TYPE = 2
 SavefileManager.SAVE_TASK_TYPE = 3
@@ -462,6 +469,10 @@ function SavefileManager:_save_cache(slot)
 	if is_setting_slot then
 		managers.user:save(cache)
 		managers.music:save_settings(cache)
+
+		if _G.IS_VR then
+			managers.vr:save(cache)
+		end
 	else
 		managers.player:save(cache)
 		managers.experience:save(cache)
@@ -826,6 +837,11 @@ function SavefileManager:_load_cache(slot)
 		if is_setting_slot then
 			managers.user:load(cache, version)
 			managers.music:load_settings(cache, version)
+
+			if _G.IS_VR then
+				managers.vr:load(cache, version)
+			end
+
 			self:_set_setting_changed(false)
 		else
 			managers.blackmarket:load(cache, version)

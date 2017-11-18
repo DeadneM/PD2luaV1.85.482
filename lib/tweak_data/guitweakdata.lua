@@ -1801,26 +1801,6 @@ function GuiTweakData:init()
 			icon = "sidebar_filters"
 		},
 		{
-			visible_callback = "clbk_visible_not_in_lobby",
-			callback = "clbk_the_basics",
-			name_id = "menu_cn_short",
-			icon = "sidebar_basics",
-			item_class = "CrimeNetSidebarTutorialHeistsItem"
-		},
-		{
-			name_id = "menu_cn_story_missions",
-			icon = "sidebar_question",
-			item_class = "CrimeNetSidebarStoryMissionItem",
-			callback = "clbk_open_story_missions"
-		},
-		{
-			name_id = "menu_cn_chill",
-			callback = "clbk_safehouse",
-			id = "safehouse",
-			icon = "sidebar_safehouse",
-			item_class = "CrimeNetSidebarSafehouseItem"
-		},
-		{
 			name_id = "menu_cn_premium_buy",
 			icon = "sidebar_broker",
 			callback = "clbk_contract_broker"
@@ -1839,21 +1819,6 @@ function GuiTweakData:init()
 			name_id = "menu_cn_gage_assignment",
 			icon = "sidebar_gage",
 			callback = "clbk_gage_courier"
-		},
-		{
-			name_id = "menu_mutators",
-			callback = "clbk_mutators",
-			id = "mutators",
-			icon = "sidebar_mutators",
-			item_class = "CrimeNetSidebarMutatorsItem"
-		},
-		{
-			visible_callback = "clbk_visible_not_in_lobby",
-			name_id = "cn_crime_spree",
-			callback = "clbk_crime_spree",
-			id = "crime_spree",
-			icon = "sidebar_crimespree",
-			item_class = "CrimeNetSidebarCrimeSpreeItem"
 		}
 	}
 	self.crime_net.codex = {

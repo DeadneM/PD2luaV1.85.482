@@ -1,3 +1,5 @@
+_G.IS_VR = _G.SystemInfo ~= nil and getmetatable(_G.SystemInfo).is_vr ~= nil and SystemInfo:is_vr()
+
 core:register_module("lib/managers/PlatformManager")
 core:register_module("lib/managers/SystemMenuManager")
 core:register_module("lib/managers/UserManager")
@@ -50,6 +52,11 @@ core:import("ControllerManager")
 core:import("SlotManager")
 core:import("FreeFlight")
 core:import("CoreGuiDataManager")
+
+if _G.IS_VR then
+	require("lib/managers/VRManagerPD2")
+end
+
 require("lib/managers/ControllerWrapper")
 require("lib/utils/game_state_machine/GameStateMachine")
 require("lib/utils/LightLoadingScreenGuiScript")
@@ -101,6 +108,8 @@ require("lib/managers/BanListManager")
 require("lib/managers/WorkshopManager")
 require("lib/managers/CustomSafehouseManager")
 require("lib/managers/MutatorsManager")
+require("lib/managers/OverlayEffectManager")
+require("lib/managers/EnvironmentControllerManager")
 require("lib/managers/TangoManager")
 require("lib/managers/CrimeSpreeManager")
 require("lib/managers/StoryMissionsManager")
@@ -230,6 +239,10 @@ function Setup:init_managers(managers)
 
 	managers.dlc:setup()
 
+	if _G.IS_VR then
+		managers.vr = VRManagerPD2:new()
+	end
+
 	managers.dyn_resource = DynamicResourceManager:new()
 	managers.gui_data = CoreGuiDataManager.GuiDataManager:new()
 	managers.platform = PlatformManager.PlatformManager:new()
@@ -289,6 +302,12 @@ function Setup:init_managers(managers)
 end
 
 function Setup:start_boot_loading_screen()
+	if _G.IS_VR then
+		VRManager:fade_to_color(0, Color(1, 0, 0, 0), false)
+
+		Global._boot_fade = true
+	end
+
 	if not PackageManager:loaded("packages/boot_screen") then
 		PackageManager:load("packages/boot_screen")
 	end
@@ -303,7 +322,13 @@ end
 function Setup:stop_loading_screen()
 	if Global.is_loading then
 		cat_print("loading_environment", "[LoadingEnvironment] Stop.")
-		self:set_main_thread_loading_screen_visible(false)
+
+		if not Global._boot_fade then
+			self:set_main_thread_loading_screen_visible(false)
+		else
+			Global._boot_fade = nil
+		end
+
 		LoadingEnvironment:stop()
 
 		Global.is_loading = nil
@@ -425,7 +450,8 @@ function Setup:_start_loading_screen()
 		res = RenderSettings.resolution,
 		layer = tweak_data.gui.LOADING_SCREEN_LAYER,
 		load_level_data = load_level_data,
-		is_win32 = SystemInfo:platform() == Idstring("WIN32")
+		is_win32 = SystemInfo:platform() == Idstring("WIN32"),
+		vr_overlays = Global.__vr_overlays
 	}
 
 	LoadingEnvironment:start(setup, "LoadingEnvironmentScene", data)
@@ -490,6 +516,7 @@ function Setup:init_finalize()
 	managers.dlc:init_finalize()
 	managers.achievment:init_finalize()
 	managers.system_menu:init_finalize()
+	managers.menu:init_finalize()
 	managers.controller:init_finalize()
 
 	if Application:editor() then
@@ -504,6 +531,10 @@ function Setup:init_finalize()
 	end
 
 	tweak_data:add_reload_callback(self, self.on_tweak_data_reloaded)
+
+	if _G.IS_VR then
+		managers.vr:init_finalize()
+	end
 end
 
 function Setup:update(t, dt)
@@ -511,6 +542,11 @@ function Setup:update(t, dt)
 	local main_dt = TimerManager:main():delta_time()
 
 	self:_upd_unload_packages()
+
+	if _G.IS_VR then
+		managers.vr:update(t, dt)
+	end
+
 	call_next_update_functions()
 	managers.weapon_factory:update(t, dt)
 	managers.platform:update(t, dt)
@@ -536,6 +572,11 @@ end
 
 function Setup:paused_update(t, dt)
 	self:_upd_unload_packages()
+
+	if _G.IS_VR then
+		managers.vr:paused_update(t, dt)
+	end
+
 	managers.platform:paused_update(t, dt)
 	managers.user:paused_update(t, dt)
 	managers.dyn_resource:update()
@@ -548,6 +589,10 @@ function Setup:paused_update(t, dt)
 end
 
 function Setup:end_update(t, dt)
+	if _G.IS_VR then
+		managers.vr:end_update(t, dt)
+	end
+
 	game_state_machine:end_update(t, dt)
 
 	while #self._end_frame_clbks > 0 do
@@ -556,10 +601,20 @@ function Setup:end_update(t, dt)
 end
 
 function Setup:paused_end_update(t, dt)
+	if _G.IS_VR then
+		managers.vr:end_update(t, dt)
+	end
+
 	game_state_machine:end_update(t, dt)
 
 	while #self._end_frame_clbks > 0 do
 		table.remove(self._end_frame_clbks, 1)()
+	end
+end
+
+function Setup:render()
+	if _G.IS_VR then
+		managers.vr:render()
 	end
 end
 
@@ -584,6 +639,10 @@ function Setup:on_tweak_data_reloaded()
 end
 
 function Setup:destroy()
+	if _G.IS_VR then
+		managers.vr:destroy()
+	end
+
 	managers.system_menu:destroy()
 	managers.menu:destroy()
 
@@ -595,6 +654,10 @@ function Setup:destroy()
 end
 
 function Setup:load_level(level, mission, world_setting, level_class_name, level_id)
+	if _G.IS_VR then
+		managers.vr:start_loading()
+	end
+
 	managers.menu:close_all_menus()
 	managers.platform:destroy_context()
 
@@ -619,6 +682,14 @@ function Setup:load_start_menu_lobby()
 end
 
 function Setup:load_start_menu()
+	if _G.IS_VR then
+		managers.vr:start_loading()
+
+		if managers.overlay_effect then
+			managers.overlay_effect:set_hmd_tracking(true)
+		end
+	end
+
 	managers.platform:set_playing(false)
 	managers.job:deactivate_current_job()
 	managers.gage_assignment:deactivate_assignments()
@@ -730,6 +801,10 @@ function Setup:block_exec()
 	end
 
 	if managers.savefile:is_active() then
+		result = true
+	end
+
+	if _G.IS_VR and managers.vr:block_exec() then
 		result = true
 	end
 

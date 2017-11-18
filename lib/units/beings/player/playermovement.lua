@@ -15,6 +15,20 @@ require("lib/units/beings/player/states/PlayerDriving")
 require("lib/units/beings/player/states/PlayerFreefall")
 require("lib/units/beings/player/states/PlayerParachuting")
 
+if _G.IS_VR then
+	require("lib/units/beings/player/states/vr/PlayerStandardVR")
+	require("lib/units/beings/player/states/vr/PlayerMaskOffVR")
+	require("lib/units/beings/player/states/vr/PlayerBleedOutVR")
+	require("lib/units/beings/player/states/vr/PlayerFatalVR")
+	require("lib/units/beings/player/states/vr/PlayerArrestedVR")
+	require("lib/units/beings/player/states/vr/PlayerTasedVR")
+	require("lib/units/beings/player/states/vr/PlayerIncapacitatedVR")
+	require("lib/units/beings/player/states/vr/PlayerCarryVR")
+	require("lib/units/beings/player/states/vr/PlayerDrivingVR")
+	require("lib/units/beings/player/states/vr/PlayerFreefallVR")
+	require("lib/units/beings/player/states/vr/PlayerParachutingVR")
+end
+
 PlayerMovement = PlayerMovement or class()
 PlayerMovement._STAMINA_INIT = tweak_data.player.movement_state.stamina.STAMINA_INIT or 10
 PlayerMovement.OUT_OF_WORLD_Z = -4000
@@ -71,9 +85,17 @@ function PlayerMovement:init(unit)
 	end
 
 	self:set_friendly_fire(true)
+
+	if _G.IS_VR then
+		self:_init_vr()
+	end
 end
 
 function PlayerMovement:post_init()
+	if _G.IS_VR then
+		self:_post_init_vr()
+	end
+
 	self._m_head_rot = self._unit:camera()._m_cam_rot
 	self._m_head_pos = self._unit:camera()._m_cam_pos
 
@@ -215,6 +237,10 @@ function PlayerMovement:change_state(name)
 end
 
 function PlayerMovement:update(unit, t, dt)
+	if _G.IS_VR then
+		self:_update_vr(unit, t, dt)
+	end
+
 	self:_calculate_m_pose()
 
 	if self:_check_out_of_world(t) then
@@ -227,13 +253,8 @@ function PlayerMovement:update(unit, t, dt)
 		self._current_state:update(t, dt)
 	end
 
-	if self._kill_overlay_t and self._kill_overlay_t < t then
-		self._kill_overlay_t = nil
-
-		managers.overlay_effect:stop_effect()
-	end
-
 	self:update_stamina(t, dt)
+	self:update_teleport(t, dt)
 end
 
 function PlayerMovement:update_stamina(t, dt, ignore_running)
@@ -254,6 +275,13 @@ function PlayerMovement:update_stamina(t, dt, ignore_running)
 		end
 	elseif self._stamina < self:_max_stamina() then
 		self:_restart_stamina_regen_timer()
+	end
+
+	if _G.IS_VR then
+		managers.hud:set_stamina({
+			current = self._stamina,
+			total = self:_max_stamina()
+		})
 	end
 end
 
@@ -940,6 +968,10 @@ function PlayerMovement:destroy(unit)
 	managers.hud:set_suspicion(false)
 	SoundDevice:set_rtpc("suspicion", 0)
 	SoundDevice:set_rtpc("stamina", 100)
+
+	if alive(self._orientation_unit) then
+		World:delete_unit(self._orientation_unit)
+	end
 end
 
 function PlayerMovement:_max_stamina()
@@ -1038,5 +1070,174 @@ end
 
 function PlayerMovement:zipline_unit()
 	return self._zipline_unit
+end
+
+function PlayerMovement:_init_vr()
+	self._orientation_unit = World:spawn_unit(Idstring("units/pd2_dlc_vr/player/vr_orientation"), Vector3(0, 0, 0), Rotation())
+
+	self._unit:link(self._orientation_unit)
+	self:set_orientation_state("none")
+end
+
+function PlayerMovement:set_orientation_state(state, base_position)
+	if state == "none" then
+		self._orientation_unit:set_visible(false)
+	else
+		self._orientation_unit:set_visible(true)
+
+		if self._orientation_unit:damage():has_sequence(state) then
+			self._orientation_unit:damage():run_sequence_simple(state)
+		end
+
+		if base_position then
+			local from = base_position + Vector3(0, 0, 100)
+			local to = base_position + Vector3(0, 0, -100)
+			local ray = self._unit:raycast("ray", from, to, "slot_mask", 1)
+
+			if ray then
+				self._orientation_unit:set_position(ray.position)
+			end
+		end
+	end
+end
+
+function PlayerMovement:_update_vr(unit, t, dt)
+	if self._block_input then
+		return
+	end
+
+	local hmd_pos = VRManager:hmd_position()
+
+	mvector3.set(self._hmd_delta, hmd_pos)
+	mvector3.subtract(self._hmd_delta, self._hmd_pos)
+	mvector3.set(self._hmd_pos, hmd_pos)
+end
+
+function PlayerMovement:_post_init_vr()
+	self._ghost_position = mvector3.copy(self._m_pos)
+	self._hmd_pos = VRManager:hmd_position()
+	self._hmd_delta = Vector3()
+end
+
+function PlayerMovement:hmd_delta()
+	return self._hmd_delta
+end
+
+function PlayerMovement:hmd_position()
+	return self._hmd_pos
+end
+
+function PlayerMovement:set_ghost_position(pos, unit_position)
+	mvector3.set(self._ghost_position, pos)
+	self._unit:set_position(unit_position and unit_position or pos)
+end
+
+function PlayerMovement:ghost_position()
+	return self._ghost_position
+end
+
+function PlayerMovement:reset_ghost_position()
+	self:set_ghost_position(self._m_pos)
+end
+
+function PlayerMovement:warping()
+	return self._state_data.warping
+end
+
+function PlayerMovement:activate_regeneration()
+	self._regenerate_timer = (tweak_data.player.movement_state.stamina.REGENERATE_TIME or 5) * managers.player:upgrade_value("player", "stamina_regen_timer_multiplier", 1)
+end
+
+function PlayerMovement:stamina()
+	return self._stamina
+end
+
+function PlayerMovement:set_block_input(block)
+	self._block_input = block
+end
+
+function PlayerMovement:reset_hmd_position()
+	mvector3.set(self._hmd_pos, VRManager:hmd_position())
+	mvector3.set_zero(self._hmd_delta)
+end
+
+function PlayerMovement:trigger_teleport(data)
+	if not data.position then
+		Application:error("[PlayerMovement:trigger_teleport] Tried to teleport without position")
+
+		return
+	end
+
+	local t = managers.player:player_timer():time()
+	self._teleport_data = clone(data)
+	local fade_in = self._teleport_data.fade_in
+	local sustain = self._teleport_data.sustain
+	local fade_out = self._teleport_data.fade_out
+	self._teleport_t = t + fade_in
+	self._teleport_done_t = self._teleport_t + sustain + fade_out
+	local effect = clone(managers.overlay_effect:presets().fade_out_in)
+	effect.fade_in = fade_in
+	effect.sustain = sustain
+	effect.fade_out = fade_out
+
+	managers.overlay_effect:play_effect(effect)
+	self._unit:base():controller():set_enabled(false)
+end
+
+function PlayerMovement:update_teleport(t, dt)
+	if not self._teleport_data then
+		return
+	end
+
+	if self._teleport_t and self._teleport_t < t then
+		self:warp_to(self._teleport_data.position, self._teleport_data.rotation)
+		self._unit:network():send("action_teleport", self._teleport_data.position)
+
+		if _G.IS_VR then
+			self:set_ghost_position(self._teleport_data.position)
+		end
+
+		self._teleport_t = nil
+		local new_selection = nil
+
+		if self._teleport_data.equip_selection and self._teleport_data.equip_selection ~= "none" then
+			local selection = self._teleport_data.equip_selection == "primary" and 2 or 1
+
+			if self._teleport_data.state ~= "mask_off" and self._teleport_data.state ~= "civilian" and self._teleport_data.state ~= "lobby_empty" then
+				if managers.player:current_state() == "mask_off" or managers.player:current_state() == "civilian" or managers.player:current_state() == "lobby_empty" then
+					new_selection = selection
+				else
+					self:current_state():_start_action_unequip_weapon(t, {selection_wanted = selection})
+				end
+			else
+				managers.player:player_unit():inventory()._equipped_selection = selection
+			end
+		end
+
+		if self._teleport_data.state then
+			managers.player:set_player_state(self._teleport_data.state)
+		end
+
+		if new_selection then
+			self:current_state():_start_action_unequip_weapon(t, {selection_wanted = new_selection})
+		end
+
+		if managers.player:is_carrying() then
+			managers.player:drop_carry()
+		end
+
+		self._unit:base():controller():set_enabled(true)
+	elseif self._teleport_done_t and self._teleport_done_t < t then
+		self._teleport_done_t = nil
+		self._teleport_data = nil
+	end
+end
+
+function PlayerMovement:teleporting()
+	return not not self._teleport_data
+end
+
+function PlayerMovement:has_teleport_data(key)
+	return self._teleport_data and not not self._teleport_data[key]
 end
 

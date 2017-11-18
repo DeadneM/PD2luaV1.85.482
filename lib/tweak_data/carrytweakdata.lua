@@ -62,6 +62,7 @@ function CarryTweakData:init(tweak_data)
 	self.types.cloaker_explosives.can_poof = true
 	self.small_loot = {
 		money_bundle = tweak_data:get_value("money_manager", "small_loot", "money_bundle"),
+		money_bundle_value = tweak_data:get_value("money_manager", "small_loot", "money_bundle_value"),
 		ring_band = tweak_data:get_value("money_manager", "small_loot", "ring_band"),
 		diamondheist_vault_bust = tweak_data:get_value("money_manager", "small_loot", "diamondheist_vault_bust"),
 		diamondheist_vault_diamond = tweak_data:get_value("money_manager", "small_loot", "diamondheist_vault_diamond"),
@@ -759,6 +760,24 @@ function CarryTweakData:init(tweak_data)
 		name_id = "hud_carry_old_wine",
 		bag_value = "old_wine",
 		visual_unit_name = "units/payday2/characters/npc_acc_loot_bag_1/npc_acc_loot_bag_1",
+		AI_carry = {SO_category = "enemies"}
+	}
+	self.bag = {
+		type = "medium",
+		name_id = "hud_carry_bag",
+		bag_value = "money",
+		unit = "units/payday2/pickups/bbv_pku_lootbag/bbv_pku_lootbag",
+		visual_unit_name = "units/payday2/characters/npc_acc_loot_bag_1/npc_acc_loot_bag_1",
+		dye = true,
+		AI_carry = {SO_category = "enemies"}
+	}
+	self.bag_01 = {
+		type = "medium",
+		name_id = "hud_carry_bag",
+		bag_value = "money",
+		unit = "units/payday2/pickups/bbv_pku_lootbag_01/bbv_pku_lootbag_01",
+		visual_unit_name = "units/payday2/characters/npc_acc_loot_bag_1/npc_acc_loot_bag_1",
+		dye = true,
 		AI_carry = {SO_category = "enemies"}
 	}
 end

@@ -40,7 +40,7 @@ function EnemyManager:update(t, dt)
 	self._queued_task_executed = nil
 
 	self:_update_gfx_lod()
-	self:_update_queued_tasks(t)
+	self:_update_queued_tasks(t, dt)
 end
 
 function EnemyManager:corpse_limit()
@@ -492,14 +492,19 @@ function EnemyManager:_execute_queued_task(i)
 	task.clbk(task.data)
 end
 
-function EnemyManager:_update_queued_tasks(t)
+function EnemyManager:_update_queued_tasks(t, dt)
 	local i_asap_task, asp_task_t = nil
+	local queue_remaining = math.ceil(dt * tweak_data.group_ai.ai_tick_rate)
 
 	for i_task, task_data in ipairs(self._queued_tasks) do
 		if not task_data.t or task_data.t < t then
 			self:_execute_queued_task(i_task)
 
-			break
+			queue_remaining = queue_remaining - 1
+
+			if queue_remaining <= 0 then
+				break
+			end
 		elseif task_data.asap and (not asp_task_t or task_data.t < asp_task_t) then
 			i_asap_task = i_task
 			asp_task_t = task_data.t

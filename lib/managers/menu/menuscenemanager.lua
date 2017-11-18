@@ -2166,7 +2166,9 @@ function MenuSceneManager:set_character(character_id, force_recreate)
 		sequence = sequence .. "_cc"
 	end
 
-	self._character_unit:damage():run_sequence_simple(sequence)
+	call_on_next_update(function ()
+		self._character_unit:damage():run_sequence_simple(sequence)
+	end)
 
 	local equipped_mask = managers.blackmarket:equipped_mask()
 
@@ -2359,7 +2361,9 @@ function MenuSceneManager:set_scene_template(template, data, custom_name, skip_t
 
 		self._fov_mod = 0
 
-		self._camera_object:set_fov(self._current_fov + (self._fov_mod or 0))
+		if self._camera_object then
+			self._camera_object:set_fov(self._current_fov + (self._fov_mod or 0))
+		end
 
 		template_data = data or self._scene_templates[template]
 		self._current_scene_template = custom_name or template
@@ -2453,7 +2457,9 @@ function MenuSceneManager:set_scene_template(template, data, custom_name, skip_t
 			end
 		end
 
-		self:_select_character_pose()
+		if not _G.IS_VR then
+			self:_select_character_pose()
+		end
 
 		if alive(self._menu_logo) then
 			self._menu_logo:set_visible(not template_data.hide_menu_logo)
@@ -2687,10 +2693,13 @@ function MenuSceneManager:spawn_grenade(grenade_id)
 		return
 	end
 
-	self:add_one_frame_delayed_clbk(callback(self, self, "spawn_grenade_clbk", grenade.unit_dummy))
+	self:add_one_frame_delayed_clbk(callback(self, self, "spawn_grenade_clbk", grenade_id))
 end
 
-function MenuSceneManager:spawn_grenade_clbk(grenade_unit)
+function MenuSceneManager:spawn_grenade_clbk(grenade_id)
+	local grenade = tweak_data.blackmarket.projectiles[grenade_id]
+	local grenade_unit = grenade.unit_dummy
+
 	if not grenade_unit then
 		return
 	end
@@ -2711,7 +2720,7 @@ function MenuSceneManager:spawn_grenade_clbk(grenade_unit)
 
 	local new_unit = World:spawn_unit(ids_unit_name, self._item_pos, self._item_rot)
 
-	self:_set_item_unit(new_unit)
+	self:_set_item_unit(new_unit, nil, nil, nil, nil, {id = grenade_id})
 	mrotation.set_yaw_pitch_roll(self._item_rot_mod, -90, 0, 0)
 
 	return new_unit
@@ -2761,7 +2770,7 @@ function MenuSceneManager:spawn_melee_weapon_clbk(melee_weapon_id)
 
 	local new_unit = World:spawn_unit(ids_unit_name, self._item_pos, self._item_rot)
 
-	self:_set_item_unit(new_unit)
+	self:_set_item_unit(new_unit, nil, nil, nil, nil, {id = melee_weapon_id})
 
 	if alive(new_unit) and new_unit:damage() and new_unit:damage():has_sequence("menu") then
 		new_unit:damage():run_sequence_simple("menu")
@@ -2862,6 +2871,10 @@ function MenuSceneManager:spawn_item_weapon(factory_id, blueprint, cosmetics, te
 
 	new_unit:base():tweak_data_anim_stop("unequip")
 	new_unit:base():tweak_data_anim_play("equip")
+
+	custom_data = custom_data or {}
+	custom_data.id = managers.weapon_factory:get_weapon_id_by_factory_id(factory_id)
+
 	self:_set_item_unit(new_unit, nil, nil, nil, second_unit, custom_data)
 	mrotation.set_yaw_pitch_roll(self._item_rot_mod, 90, 0, 0)
 
@@ -2930,7 +2943,7 @@ function MenuSceneManager:_spawn_item(unit_name, oobb_object, max_mod, type, mas
 	local unit = nil
 	unit = type == "mask" and self:_spawn_mask(unit_name, true, self._item_pos, self._item_rot, mask_id) or World:spawn_unit(Idstring(unit_name), self._item_pos, self._item_rot)
 
-	self:_set_item_unit(unit, oobb_object, max_mod, type)
+	self:_set_item_unit(unit, oobb_object, max_mod, type, nil, {id = mask_id})
 end
 
 function MenuSceneManager:_set_weapon_upgrades(weapon_id)
@@ -3593,15 +3606,17 @@ function MenuSceneManager:start_open_economy_safe()
 	self._safe_scene_destroyed = false
 
 	if self:_check_safe_data_loaded() then
-		self._safe_shake = self._shaker:play("cash_opening", 0)
+		if not _G.IS_VR then
+			self._safe_shake = self._shaker:play("cash_opening", 0)
 
-		self._shaker:set_parameter(self._safe_shake, "amplitude", 1)
+			self._shaker:set_parameter(self._safe_shake, "amplitude", 1)
 
-		self._safe_shake_transition = {
-			lerp = 0,
-			speed = 0.05
-		}
-		self._safe_shake_transition.target_speed = self._safe_shake_transition.speed
+			self._safe_shake_transition = {
+				lerp = 0,
+				speed = 0.05
+			}
+			self._safe_shake_transition.target_speed = self._safe_shake_transition.speed
+		end
 
 		self:_create_economy_safe_scene()
 
@@ -3966,5 +3981,9 @@ function MenuSceneManager:destroy()
 	if self._vp then
 		self._vp:destroy()
 	end
+end
+
+if _G.IS_VR then
+	require("lib/managers/MenuSceneManagerVR")
 end
 
