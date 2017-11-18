@@ -10,7 +10,16 @@ function MissionAccessCamera:init(unit)
 	self._camera:set_near_range(15)
 	self._camera:set_far_range(250000)
 
-	self._viewport = managers.viewport:new_vp(0, 0, 1, 1, "MissionAccessCamera", CoreManagerBase.PRIO_WORLDCAMERA)
+	local scale_x = 1
+	local scale_y = 1
+
+	if _G.IS_VR then
+		local resolution = VRManager:target_resolution()
+		scale_x = 1280 / resolution.x
+		scale_y = 720 / resolution.y
+	end
+
+	self._viewport = managers.viewport:new_vp(0, 0, scale_x, scale_y, "MissionAccessCamera", CoreManagerBase.PRIO_WORLDCAMERA)
 	self._director = self._viewport:director()
 	self._shaker = self._director:shaker()
 	self._camera_controller = self._director:make_camera(self._camera, Idstring("previs_camera"))
@@ -19,6 +28,14 @@ function MissionAccessCamera:init(unit)
 	self._director:set_camera(self._camera_controller)
 	self._director:position_as(self._camera)
 	self._camera_controller:set_both(self._unit)
+
+	if _G.IS_VR then
+		self._camera:set_stereo(false)
+		self._viewport:set_render_params("World", self._viewport:vp(), managers.menu._render_target)
+		self._viewport:set_enable_adaptive_quality(false)
+		self._viewport:vp():set_post_processor_effect("World", Idstring("depth_projection"), Idstring("render_backbuffer_to_target"))
+		managers.viewport:move_to_front(self._viewport)
+	end
 end
 
 function MissionAccessCamera:_setup_sound_listener()

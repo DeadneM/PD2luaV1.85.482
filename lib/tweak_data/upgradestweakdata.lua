@@ -61,16 +61,38 @@ function UpgradesTweakData:_init_pd2_values()
 			0.85,
 			0.8,
 			0.7
-		},
-		skill_ammo_mul = {
-			1,
-			1.02,
-			1.04,
-			1.06,
-			1.8,
-			1.1,
-			1.12
 		}
+	}
+
+	if _G.IS_VR then
+		self.values.player.body_armor.armor = {
+			0.6,
+			4.5,
+			5.8,
+			7.1,
+			9.7,
+			12.3,
+			20.1
+		}
+		self.values.player.body_armor.dodge = {
+			0.1,
+			-0,
+			-0.05,
+			-0.1,
+			-0.15,
+			-0.2,
+			-0.5
+		}
+	end
+
+	self.values.player.body_armor.skill_ammo_mul = {
+		1,
+		1.02,
+		1.04,
+		1.06,
+		1.8,
+		1.1,
+		1.12
 	}
 	self.values.player.ballistic_vest_concealment = {4}
 	self.values.player.body_armor.skill_max_health_store = {
@@ -311,6 +333,12 @@ function UpgradesTweakData:_init_pd2_values()
 	}
 	self.values.player.non_special_melee_multiplier = {2}
 	self.values.player.melee_damage_multiplier = {2}
+
+	if _G.IS_VR then
+		self.values.player.non_special_melee_multiplier = {4}
+		self.values.player.melee_damage_multiplier = {4}
+	end
+
 	self.values.player.primary_weapon_when_downed = {true}
 	self.values.player.armor_regen_timer_multiplier = {0.85}
 	self.values.temporary.dmg_multiplier_outnumbered = {{
@@ -2294,6 +2322,14 @@ function UpgradesTweakData:_init_pd2_values()
 		hoxton_tier5 = {{}},
 		hoxton_tier6 = {{}}
 	}
+
+	if _G.IS_VR then
+		editable_skill_descs.steroids = {
+			{"300%"},
+			{"300%"}
+		}
+	end
+
 	self.skill_descs = {}
 
 	for skill_id, skill_desc in pairs(editable_skill_descs) do

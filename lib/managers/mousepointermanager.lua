@@ -15,37 +15,56 @@ function MousePointerManager:_setup()
 	self._test_controller_acc = nil
 	self._enabled = true
 	self._ws = managers.gui_data:create_fullscreen_workspace()
-	local x = 640
-	local y = 360
-	self._mouse = self._ws:panel():panel({
-		name = "mouse",
-		h = 23,
-		w = 19,
-		name_s = "mouse",
-		x = x,
-		y = y,
-		layer = tweak_data.gui.MOUSE_LAYER
-	})
 
-	self._mouse:bitmap({
-		texture = "guis/textures/mouse_pointer",
-		name = "pointer",
-		h = 23,
-		rotation = 360,
-		w = 19,
-		y = -2,
-		x = -7,
-		texture_rect = {
-			0,
-			0,
-			19,
-			23
-		},
-		color = Color(1, 0.7, 0.7, 0.7)
-	})
+	self:_setup_mouse_pointer(self._ws)
 	self._ws:hide()
 
 	self._resolution_changed_callback_id = managers.viewport:add_resolution_changed_func(callback(self, self, "resolution_changed"))
+end
+
+function MousePointerManager:_setup_mouse_pointer(ws)
+	self._mouse_pointers = self._mouse_pointers or {}
+
+	if not self._mouse_pointers[ws:key()] then
+		local x = 640
+		local y = 360
+		local mouse = self._ws:panel():panel({
+			name = "mouse",
+			h = 23,
+			w = 19,
+			name_s = "mouse",
+			x = x,
+			y = y,
+			layer = tweak_data.gui.MOUSE_LAYER
+		})
+		local visible_pointer = true
+
+		if _G.IS_VR then
+			visible_pointer = false
+		end
+
+		mouse:bitmap({
+			texture = "guis/textures/mouse_pointer",
+			name = "pointer",
+			h = 23,
+			rotation = 360,
+			w = 19,
+			y = -2,
+			x = -7,
+			texture_rect = {
+				0,
+				0,
+				19,
+				23
+			},
+			color = Color(1, 0.7, 0.7, 0.7),
+			visible = visible_pointer
+		})
+
+		self._mouse_pointers[ws:key()] = mouse
+	end
+
+	self._mouse = self._mouse_pointers[ws:key()]
 end
 
 function MousePointerManager:resolution_changed()
@@ -240,7 +259,11 @@ function MousePointerManager:_activate()
 	self._enabled = true
 
 	self._ws:show()
-	self._ws:connect_mouse(managers.controller:get_mouse_controller())
+
+	if not _G.IS_VR then
+		self._ws:connect_mouse(managers.controller:get_mouse_controller())
+	end
+
 	self._ws:feed_mouse_position(self._mouse:world_position())
 
 	if not self._controller_updater then
@@ -460,5 +483,31 @@ function MousePointerManager:modified_fullscreen_16_9_mouse_pos(x, y)
 	local x, y = self._mouse:world_position()
 
 	return self:convert_fullscreen_16_9_mouse_pos(x, y)
+end
+
+function MousePointerManager:workspace()
+	return self._ws
+end
+
+function MousePointerManager:set_custom_workspace(ws)
+	if ws then
+		self._default_ws = self._default_ws or self._ws
+		self._ws = ws
+	elseif self._default_ws then
+		self._ws = self._default_ws
+		self._default_ws = nil
+	end
+
+	local active = self._active
+
+	if active then
+		self:_deactivate()
+	end
+
+	self:_setup_mouse_pointer(ws)
+
+	if active then
+		self:_activate()
+	end
 end
 

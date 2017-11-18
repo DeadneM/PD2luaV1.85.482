@@ -6059,10 +6059,13 @@ function BlackMarketGui:update_info_text()
 						end
 					end
 
+					local vr_lock_text = slot_data.vr_locked and "bm_menu_vr_locked"
 					local text = ""
 
 					if slot_data.install_lock then
 						text = text .. managers.localization:to_upper_text(slot_data.install_lock, {}) .. "\n"
+					elseif vr_lock_text then
+						text = text .. managers.localization:to_upper_text(vr_lock_text) .. "\n"
 					elseif dlc_text_id then
 						text = text .. managers.localization:to_upper_text(dlc_text_id, {}) .. "\n"
 					elseif part_dlc_text_id then
@@ -6146,9 +6149,12 @@ function BlackMarketGui:update_info_text()
 			local level_text_id = level_based and "bm_menu_level_req" or false
 			local dlc_text_id = dlc_based and slot_data.dlc_locked or false
 			local text = ""
+			local vr_lock_text = slot_data.vr_locked and "bm_menu_vr_locked"
 
 			if slot_data.install_lock then
 				text = text .. managers.localization:to_upper_text(slot_data.install_lock, {}) .. "\n"
+			elseif vr_lock_text then
+				text = text .. managers.localization:to_upper_text(vr_lock_text) .. "\n"
 			elseif skill_text_id then
 				text = text .. managers.localization:to_upper_text(skill_text_id, {slot_data.name_localized}) .. "\n"
 			elseif dlc_text_id then
@@ -7846,6 +7852,10 @@ function BlackMarketGui:mouse_pressed(button, x, y)
 	if self._selected_slot and self._selected_slot._equipped_rect then
 		self._selected_slot._equipped_rect:set_alpha(0.6)
 	end
+
+	if _G.IS_VR and button == Idstring("0") and self._selected_slot._panel:inside(x, y) then
+		self:press_first_btn(button)
+	end
 end
 
 function BlackMarketGui:mouse_released(o, button, x, y)
@@ -8646,6 +8656,10 @@ function BlackMarketGui:get_lock_icon(data, default)
 	local level = data.level
 	local skill_based = data.skill_based
 	local func_based = data.func_based
+
+	if _G.IS_VR and data.vr_locked then
+		return "units/pd2_dlc_vr/player/lock_vr"
+	end
 
 	if unlocked and (type(unlocked) ~= "number" or unlocked > 0) then
 		return nil
@@ -10607,6 +10621,12 @@ function BlackMarketGui:populate_weapon_category_new(data)
 			new_data.stream = true
 			new_data.comparision_data = not new_data.ignore_slot and managers.blackmarket:get_weapon_stats(category, index)
 			new_data.global_value = part_dlc_lock or tweak_data.weapon[new_data.name] and tweak_data.weapon[new_data.name].global_value or "normal"
+
+			if _G.IS_VR then
+				new_data.vr_locked = tweak_data.vr:is_locked("weapons", crafted.weapon_id)
+				new_data.unlocked = new_data.unlocked and not tweak_data.vr:is_locked("weapons", crafted.weapon_id)
+			end
+
 			new_data.dlc_locked = tweak_data.lootdrop.global_values[new_data.global_value].unlock_id or nil
 			new_data.lock_texture = new_data.ignore_slot or self:get_lock_icon(new_data)
 			new_data.holding = currently_holding and hold_crafted_item.slot == index
@@ -10886,6 +10906,10 @@ function BlackMarketGui:populate_melee_weapons_new(data)
 		new_data.skill_based = melee_weapon_data[2].skill_based
 		new_data.skill_name = "bm_menu_skill_locked_" .. new_data.name
 		new_data.func_based = melee_weapon_data[2].func_based
+
+		if _G.IS_VR then
+			new_data.vr_locked = melee_weapon_data[2].vr_locked
+		end
 
 		if m_tweak_data and m_tweak_data.locks then
 			local dlc = m_tweak_data.locks.dlc
@@ -11442,6 +11466,129 @@ function BlackMarketGui:populate_mods(data)
 	local weapon_blueprint = managers.blackmarket:get_weapon_blueprint(data.prev_node_data.category, data.prev_node_data.slot) or {}
 	local equipped = nil
 
+
+	local function update_equipped()
+		if equipped then
+			data[equipped].equipped = true
+			data[equipped].unlocked = not crafted.customize_locked and (data[equipped].unlocked or true)
+			data[equipped].mid_text = crafted.customize_locked and data[equipped].mid_text or nil
+			data[equipped].lock_texture = crafted.customize_locked and data[equipped].lock_texture or nil
+			data[equipped].corner_text = crafted.customize_locked and data[equipped].corner_text or nil
+
+			for i = 1, #data[equipped], 1 do
+				table.remove(data[equipped], 1)
+			end
+
+			data[equipped].price = 0
+			data[equipped].can_afford = true
+
+			if not crafted.customize_locked then
+				table.insert(data[equipped], "wm_remove_buy")
+
+				if not data[equipped].is_internal then
+					local preview_forbidden = managers.blackmarket:is_previewing_legendary_skin() or managers.blackmarket:preview_mod_forbidden(data[equipped].category, data[equipped].slot, data[equipped].name)
+
+					if managers.blackmarket:is_previewing_any_mod() then
+						table.insert(data[equipped], "wm_clear_mod_preview")
+					end
+
+					if managers.blackmarket:is_previewing_mod(data[equipped].name) then
+						table.insert(data[equipped], "wm_remove_preview")
+					elseif not preview_forbidden then
+						table.insert(data[equipped], "wm_preview_mod")
+					end
+				else
+					table.insert(data[equipped], "wm_preview")
+				end
+
+				if managers.workshop and managers.workshop:enabled() and data.prev_node_data and not table.contains(managers.blackmarket:skin_editor():get_excluded_weapons(), data.prev_node_data.name) then
+					table.insert(data[equipped], "w_skin")
+				end
+
+				local weapon_mod_tweak = tweak_data.weapon.factory.parts[data[equipped].name]
+
+				if weapon_mod_tweak and weapon_mod_tweak.type ~= "bonus" and weapon_mod_tweak.is_a_unlockable ~= true then
+					table.insert(data[equipped], "wm_buy_mod")
+				end
+			end
+
+			local factory = tweak_data.weapon.factory.parts[data[equipped].name]
+
+			if (data.name == "sight" or data.name == "gadget") and factory and factory.texture_switch then
+				if not crafted.customize_locked then
+					table.insert(data[equipped], "wm_reticle_switch_menu")
+				end
+
+				local reticle_texture = managers.blackmarket:get_part_texture_switch(data[equipped].category, data[equipped].slot, data[equipped].name)
+
+				if reticle_texture and reticle_texture ~= "" then
+					data[equipped].mini_icons = data[equipped].mini_icons or {}
+
+					table.insert(data[equipped].mini_icons, {
+						layer = 2,
+						h = 30,
+						stream = true,
+						w = 30,
+						blend_mode = "add",
+						bottom = 1,
+						right = 1,
+						texture = reticle_texture
+					})
+				end
+			end
+
+			local mod_td = tweak_data.weapon.factory.parts[data[equipped].name]
+
+			if (data.name == "gadget" or table.contains(mod_td.perks or {}, "gadget")) and (mod_td.sub_type == "laser" or mod_td.sub_type == "flashlight") then
+				if not crafted.customize_locked then
+					table.insert(data[equipped], "wm_customize_gadget")
+				end
+
+				local secondary_sub_type = false
+
+				if mod_td.adds then
+					for _, part_id in ipairs(mod_td.adds) do
+						local sub_type = tweak_data.weapon.factory.parts[part_id].sub_type
+
+						if sub_type == "laser" or sub_type == "flashlight" then
+							secondary_sub_type = sub_type
+
+							break
+						end
+					end
+				end
+
+				local colors = managers.blackmarket:get_part_custom_colors(data[equipped].category, data[equipped].slot, data[equipped].name)
+
+				if colors then
+					data[equipped].mini_colors = {}
+
+					table.insert(data[equipped].mini_colors, {
+						alpha = 0.8,
+						blend = "add",
+						color = colors[mod_td.sub_type] or Color(1, 0, 1)
+					})
+
+					if secondary_sub_type then
+						table.insert(data[equipped].mini_colors, {
+							alpha = 0.8,
+							blend = "add",
+							color = colors[secondary_sub_type] or Color(1, 0, 1)
+						})
+					end
+				end
+			end
+
+			if not data[equipped].conflict and false then
+				if data[equipped].default_mod then
+					data[equipped].comparision_data = managers.blackmarket:get_weapon_stats_with_mod(data[equipped].category, data[equipped].slot, data[equipped].default_mod)
+				else
+					data[equipped].comparision_data = managers.blackmarket:get_weapon_stats_without_mod(data[equipped].category, data[equipped].slot, data[equipped].name)
+				end
+			end
+		end
+	end
+
 	for i, mod in ipairs(data) do
 		for _, weapon_mod in ipairs(weapon_blueprint) do
 			if mod.name == weapon_mod and (not global_values[weapon_mod] or global_values[weapon_mod] == data[i].global_value) then
@@ -11452,125 +11599,7 @@ function BlackMarketGui:populate_mods(data)
 		end
 	end
 
-	if equipped then
-		data[equipped].equipped = true
-		data[equipped].unlocked = not crafted.customize_locked and (data[equipped].unlocked or true)
-		data[equipped].mid_text = crafted.customize_locked and data[equipped].mid_text or nil
-		data[equipped].lock_texture = crafted.customize_locked and data[equipped].lock_texture or nil
-		data[equipped].corner_text = crafted.customize_locked and data[equipped].corner_text or nil
-
-		for i = 1, #data[equipped], 1 do
-			table.remove(data[equipped], 1)
-		end
-
-		data[equipped].price = 0
-		data[equipped].can_afford = true
-
-		if not crafted.customize_locked then
-			table.insert(data[equipped], "wm_remove_buy")
-
-			if not data[equipped].is_internal then
-				local preview_forbidden = managers.blackmarket:is_previewing_legendary_skin() or managers.blackmarket:preview_mod_forbidden(data[equipped].category, data[equipped].slot, data[equipped].name)
-
-				if managers.blackmarket:is_previewing_any_mod() then
-					table.insert(data[equipped], "wm_clear_mod_preview")
-				end
-
-				if managers.blackmarket:is_previewing_mod(data[equipped].name) then
-					table.insert(data[equipped], "wm_remove_preview")
-				elseif not preview_forbidden then
-					table.insert(data[equipped], "wm_preview_mod")
-				end
-			else
-				table.insert(data[equipped], "wm_preview")
-			end
-
-			if managers.workshop and managers.workshop:enabled() and data.prev_node_data and not table.contains(managers.blackmarket:skin_editor():get_excluded_weapons(), data.prev_node_data.name) then
-				table.insert(data[equipped], "w_skin")
-			end
-
-			local weapon_mod_tweak = tweak_data.weapon.factory.parts[data[equipped].name]
-
-			if weapon_mod_tweak and weapon_mod_tweak.type ~= "bonus" and weapon_mod_tweak.is_a_unlockable ~= true then
-				table.insert(data[equipped], "wm_buy_mod")
-			end
-		end
-
-		local factory = tweak_data.weapon.factory.parts[data[equipped].name]
-
-		if (data.name == "sight" or data.name == "gadget") and factory and factory.texture_switch then
-			if not crafted.customize_locked then
-				table.insert(data[equipped], "wm_reticle_switch_menu")
-			end
-
-			local reticle_texture = managers.blackmarket:get_part_texture_switch(data[equipped].category, data[equipped].slot, data[equipped].name)
-
-			if reticle_texture and reticle_texture ~= "" then
-				data[equipped].mini_icons = data[equipped].mini_icons or {}
-
-				table.insert(data[equipped].mini_icons, {
-					layer = 2,
-					h = 30,
-					stream = true,
-					w = 30,
-					blend_mode = "add",
-					bottom = 1,
-					right = 1,
-					texture = reticle_texture
-				})
-			end
-		end
-
-		local mod_td = tweak_data.weapon.factory.parts[data[equipped].name]
-
-		if (data.name == "gadget" or table.contains(mod_td.perks or {}, "gadget")) and (mod_td.sub_type == "laser" or mod_td.sub_type == "flashlight") then
-			if not crafted.customize_locked then
-				table.insert(data[equipped], "wm_customize_gadget")
-			end
-
-			local secondary_sub_type = false
-
-			if mod_td.adds then
-				for _, part_id in ipairs(mod_td.adds) do
-					local sub_type = tweak_data.weapon.factory.parts[part_id].sub_type
-
-					if sub_type == "laser" or sub_type == "flashlight" then
-						secondary_sub_type = sub_type
-
-						break
-					end
-				end
-			end
-
-			local colors = managers.blackmarket:get_part_custom_colors(data[equipped].category, data[equipped].slot, data[equipped].name)
-
-			if colors then
-				data[equipped].mini_colors = {}
-
-				table.insert(data[equipped].mini_colors, {
-					alpha = 0.8,
-					blend = "add",
-					color = colors[mod_td.sub_type] or Color(1, 0, 1)
-				})
-
-				if secondary_sub_type then
-					table.insert(data[equipped].mini_colors, {
-						alpha = 0.8,
-						blend = "add",
-						color = colors[secondary_sub_type] or Color(1, 0, 1)
-					})
-				end
-			end
-		end
-
-		if not data[equipped].conflict and false then
-			if data[equipped].default_mod then
-				data[equipped].comparision_data = managers.blackmarket:get_weapon_stats_with_mod(data[equipped].category, data[equipped].slot, data[equipped].default_mod)
-			else
-				data[equipped].comparision_data = managers.blackmarket:get_weapon_stats_without_mod(data[equipped].category, data[equipped].slot, data[equipped].name)
-			end
-		end
-	end
+	update_equipped()
 end
 
 function BlackMarketGui:set_equipped_comparision(data)
@@ -13459,6 +13488,10 @@ function BlackMarketGui:open_weapon_buy_menu(data, check_allowed_item_func)
 	for category, items in pairs(item_categories) do
 		table.insert(sorted_categories, category)
 		table.sort(items, function (x, y)
+			if _G.IS_VR and x.vr_locked ~= y.vr_locked then
+				return not x.vr_locked
+			end
+
 			x_unlocked = managers.blackmarket:weapon_unlocked(x.weapon_id)
 			y_unlocked = managers.blackmarket:weapon_unlocked(y.weapon_id)
 

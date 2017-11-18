@@ -59,6 +59,12 @@ function MenuManager:init(is_start_menu)
 		}
 
 		self:register_menu(menu_main)
+
+		if _G.IS_VR then
+			local menu_data = self._registered_menus.menu_main.data
+			local lobby_parameters = menu_data:get_node("lobby"):parameters()
+			lobby_parameters.scene_state = "lobby_vr"
+		end
 	else
 		local menu_pause = {
 			input = "MenuInput",
@@ -193,6 +199,9 @@ function MenuManager:init(is_start_menu)
 	self:video_aa_changed(nil, nil, managers.user:get_setting("video_aa"))
 	managers.user:add_setting_changed_callback("workshop", callback(self, self, "workshop_changed"), true)
 	self:workshop_changed(nil, nil, managers.user:get_setting("workshop"))
+end
+
+function MenuManager:init_finalize()
 end
 
 function MenuManager:post_event(event)
@@ -2079,6 +2088,10 @@ function MenuCallbackHandler:is_actually_win32()
 	return SystemInfo:platform() == Idstring("WIN32")
 end
 
+function MenuCallbackHandler:is_win32_pc()
+	return SystemInfo:platform() == Idstring("WIN32") and not self:is_vr()
+end
+
 function MenuCallbackHandler:is_steam()
 	return SystemInfo:distribution() == Idstring("STEAM")
 end
@@ -2288,6 +2301,10 @@ end
 
 function MenuCallbackHandler:is_not_editor()
 	return not Application:editor()
+end
+
+function MenuCallbackHandler:is_vr()
+	return _G.IS_VR
 end
 
 function MenuCallbackHandler:show_credits()
@@ -3381,6 +3398,10 @@ function MenuCallbackHandler:become_infamous(params)
 	end
 
 	managers.menu:show_confirm_become_infamous(params)
+end
+
+function MenuCallbackHandler:toggle_adaptive_quality(item)
+	managers.user:set_setting("adaptive_quality", item:value() == "on")
 end
 
 function MenuCallbackHandler:choice_choose_video_adapter(item)
@@ -6114,6 +6135,10 @@ function MenuCrimeNetContractInitiator:modify_node(original_node, data)
 				buy_contract_item:set_enabled(can_afford)
 			end
 		end
+	end
+
+	if tweak_data.narrative:is_job_locked(data.job_id) then
+		node:item("accept_contract"):set_enabled(false)
 	end
 
 	if data and data.back_callback then
@@ -9259,6 +9284,8 @@ function MenuOptionInitiator:modify_node(node)
 		return self:modify_gameplay_options(node)
 	elseif node_name == "user_interface_options" then
 		return self:modify_user_interface_options(node)
+	elseif node_name == "vr_options" then
+		return self:modify_vr_options(node)
 	end
 end
 
@@ -9364,6 +9391,12 @@ function MenuOptionInitiator:modify_adv_video(node)
 		end
 
 		color_grading_item:set_value(managers.user:get_setting("video_color_grading"))
+	end
+
+	local toggle_adaptive_quality = node:item("toggle_adaptive_quality")
+
+	if toggle_adaptive_quality then
+		toggle_adaptive_quality:set_value(managers.user:get_setting("adaptive_quality") and "on" or "off")
 	end
 
 	return node
@@ -10980,5 +11013,9 @@ function MenuCallbackHandler:set_gadget_customize_params()
 
 	managers.blackmarket:set_part_custom_colors(category, slot, part_id, colors)
 	managers.menu:back()
+end
+
+if _G.IS_VR then
+	require("lib/managers/MenuManagerVR")
 end
 

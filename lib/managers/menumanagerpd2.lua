@@ -274,6 +274,7 @@ function MenuCallbackHandler:close_custom_safehouse_menu()
 end
 
 function MenuCallbackHandler:should_show_old_safehouse()
+	return false
 	return not managers.custom_safehouse:unlocked()
 end
 

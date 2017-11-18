@@ -55,6 +55,10 @@ function MenuMainState:at_enter(old_state)
 				color = Color.black
 			})
 		end
+
+		if _G.IS_VR then
+			managers.menu:initialize_customization_gui()
+		end
 	end
 
 	local has_invite = false
@@ -109,7 +113,7 @@ function MenuMainState:at_enter(old_state)
 		Global.open_trial_buy = nil
 
 		managers.menu:open_node("trial_info")
-	elseif not has_invite and not managers.network:session() then
+	elseif not has_invite and not managers.network:session() and false then
 		if managers.statistics:get_play_time() < 300 then
 			managers.features:announce_feature("short_heist")
 		end
@@ -174,6 +178,9 @@ function MenuMainState:at_exit(new_state)
 
 		self._sound_listener = nil
 	end
+end
+
+function MenuMainState:update(t, dt)
 end
 
 function MenuMainState:on_server_left()

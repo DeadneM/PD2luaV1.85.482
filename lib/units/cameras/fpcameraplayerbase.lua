@@ -65,6 +65,26 @@ function FPCameraPlayerBase:init(unit)
 
 	self:check_flashlight_enabled()
 	self:load_fps_mask_units()
+
+	if _G.IS_VR then
+		self._hmd_tracking = true
+		local rot = VRManager:hmd_rotation()
+		self._base_rotation = self._output_data.rotation
+		self._fadeout = {
+			value = 0,
+			fadein_speed = 0,
+			effect = {
+				blend_mode = "normal",
+				fade_out = 0,
+				play_paused = true,
+				fade_in = 0,
+				color = Color(0, 0, 0, 0),
+				timer = TimerManager:main()
+			},
+			slotmask = managers.slot:get_mask("statics")
+		}
+		self._ghost_reset_timer_t = 0
+	end
 end
 
 function FPCameraPlayerBase:set_parent_unit(parent_unit)
@@ -85,6 +105,10 @@ function FPCameraPlayerBase:set_parent_unit(parent_unit)
 		self._look_function = callback(self, self, "_gamepad_look_function_ctl")
 		self._tweak_data.uses_keyboard = false
 	end
+
+	if _G.IS_VR then
+		self._fadeout.effect_id = self._fadeout.effect_id or managers.overlay_effect:play_effect(self._fadeout.effect)
+	end
 end
 
 function FPCameraPlayerBase:parent_destroyed_clbk(parent_unit)
@@ -103,7 +127,14 @@ function FPCameraPlayerBase:update(unit, t, dt)
 		self:_update_aim_assist_sticky(t, dt)
 	end
 
-	self._parent_unit:base():controller():get_input_axis_clbk("look", callback(self, self, "_update_rot"))
+	if _G.IS_VR and self._hmd_tracking and not self._block_input then
+		self._output_data.rotation = self._base_rotation * VRManager:hmd_rotation()
+	end
+
+	if not _G.IS_VR then
+		self._parent_unit:base():controller():get_input_axis_clbk("look", callback(self, self, "_update_rot"))
+	end
+
 	self:_update_stance(t, dt)
 	self:_update_movement(t, dt)
 
@@ -112,6 +143,10 @@ function FPCameraPlayerBase:update(unit, t, dt)
 		self._parent_unit:camera():set_rotation(self._output_data.rotation)
 	else
 		self:_set_camera_position_in_vehicle()
+	end
+
+	if _G.IS_VR then
+		self._parent_unit:camera():update_transform()
 	end
 
 	if self._fov.dirty then
@@ -295,41 +330,59 @@ function FPCameraPlayerBase:_update_movement(t, dt)
 	local new_head_rot = mrot2
 
 	self._parent_unit:m_position(new_head_pos)
-	mvector3.add(new_head_pos, self._head_stance.translation)
 
-	local stick_input_x = 0
-	local stick_input_y = 0
-	local aim_assist_x, aim_assist_y = self:_get_aim_assist(t, dt, self._tweak_data.aim_assist_snap_speed, self._aim_assist)
-	stick_input_x = stick_input_x + self:_horizonatal_recoil_kick(t, dt) + aim_assist_x
-	stick_input_y = stick_input_y + self:_vertical_recoil_kick(t, dt) + aim_assist_y
-	local look_polar_spin = data.spin - stick_input_x
-	local look_polar_pitch = math.clamp(data.pitch + stick_input_y, -85, 85)
+	if _G.IS_VR then
+		local hmd_position = mvec1
+		local mover_position = mvec3
 
-	if not self._limits or not self._limits.spin then
-		look_polar_spin = look_polar_spin % 360
+		mvector3.set(mover_position, new_head_pos)
+		mvector3.set(hmd_position, self._parent_movement_ext:hmd_position())
+		mvector3.set(new_head_pos, self._parent_movement_ext:ghost_position())
+		mvector3.set_x(hmd_position, 0)
+		mvector3.set_y(hmd_position, 0)
+		mvector3.add(new_head_pos, hmd_position)
+		mvector3.add(mover_position, hmd_position)
+		self:_update_fadeout(mover_position, new_head_pos, t, dt)
+		self:_horizonatal_recoil_kick(t, dt)
+		self:_vertical_recoil_kick(t, dt)
+	else
+		mvector3.add(new_head_pos, self._head_stance.translation)
+
+		local stick_input_x = 0
+		local stick_input_y = 0
+		local aim_assist_x, aim_assist_y = self:_get_aim_assist(t, dt, self._tweak_data.aim_assist_snap_speed, self._aim_assist)
+		stick_input_x = stick_input_x + self:_horizonatal_recoil_kick(t, dt) + aim_assist_x
+		stick_input_y = stick_input_y + self:_vertical_recoil_kick(t, dt) + aim_assist_y
+		local look_polar_spin = data.spin - stick_input_x
+		local look_polar_pitch = math.clamp(data.pitch + stick_input_y, -85, 85)
+
+		if not self._limits or not self._limits.spin then
+			look_polar_spin = look_polar_spin % 360
+		end
+
+		local look_polar = Polar(1, look_polar_pitch, look_polar_spin)
+		local look_vec = look_polar:to_vector()
+		local cam_offset_rot = mrot3
+
+		mrotation.set_look_at(cam_offset_rot, look_vec, math.UP)
+		mrotation.set_zero(new_head_rot)
+		mrotation.multiply(new_head_rot, self._head_stance.rotation)
+		mrotation.multiply(new_head_rot, cam_offset_rot)
+
+		data.pitch = look_polar_pitch
+		data.spin = look_polar_spin
+		self._output_data.rotation = new_head_rot or self._output_data.rotation
+
+		if self._camera_properties.current_tilt ~= self._camera_properties.target_tilt then
+			self._camera_properties.current_tilt = math.step(self._camera_properties.current_tilt, self._camera_properties.target_tilt, 150 * dt)
+		end
+
+		if self._camera_properties.current_tilt ~= 0 then
+			self._output_data.rotation = Rotation(self._output_data.rotation:yaw(), self._output_data.rotation:pitch(), self._output_data.rotation:roll() + self._camera_properties.current_tilt)
+		end
 	end
 
-	local look_polar = Polar(1, look_polar_pitch, look_polar_spin)
-	local look_vec = look_polar:to_vector()
-	local cam_offset_rot = mrot3
-
-	mrotation.set_look_at(cam_offset_rot, look_vec, math.UP)
-	mrotation.set_zero(new_head_rot)
-	mrotation.multiply(new_head_rot, self._head_stance.rotation)
-	mrotation.multiply(new_head_rot, cam_offset_rot)
-
-	data.pitch = look_polar_pitch
-	data.spin = look_polar_spin
 	self._output_data.position = new_head_pos
-	self._output_data.rotation = new_head_rot or self._output_data.rotation
-
-	if self._camera_properties.current_tilt ~= self._camera_properties.target_tilt then
-		self._camera_properties.current_tilt = math.step(self._camera_properties.current_tilt, self._camera_properties.target_tilt, 150 * dt)
-	end
-
-	if self._camera_properties.current_tilt ~= 0 then
-		self._output_data.rotation = Rotation(self._output_data.rotation:yaw(), self._output_data.rotation:pitch(), self._output_data.rotation:roll() + self._camera_properties.current_tilt)
-	end
 
 	mvector3.set(new_shoulder_pos, self._shoulder_stance.translation)
 	mvector3.add(new_shoulder_pos, self._vel_overshot.translation)
@@ -529,7 +582,17 @@ function FPCameraPlayerBase:_set_camera_position_in_vehicle()
 	local pos = obj_pos + target
 	local camera_pos = obj_pos + target_camera
 
-	if seat.driving then
+	if _G.IS_VR then
+		local rot = Rotation((obj_rot:yaw() - self._initial_hmd_rotation:yaw()) - self:base_rotation():yaw(), 0, 0)
+
+		mvector3.set(camera_pos, self._parent_movement_ext:ghost_position())
+		mvector3.add(camera_pos, Vector3(0, 0, self._parent_movement_ext:hmd_position().z))
+		mrotation.set_zero(camera_rot)
+		mrotation.multiply(camera_rot, rot)
+		mrotation.multiply(camera_rot, self._output_data.rotation)
+	end
+
+	if _G.IS_VR or seat.driving then
 		if vehicle_unit:camera() then
 			vehicle_unit:camera():update_camera()
 		end
@@ -1851,5 +1914,136 @@ function FPCameraPlayerBase:smoothstep(a, b, step, n)
 	local x = a * (1 - v) + b * v
 
 	return x
+end
+local mvec_temp1 = Vector3()
+local mvec_temp2 = Vector3()
+local mvec_temp3 = Vector3()
+
+function FPCameraPlayerBase:_update_fadeout(mover_position, new_head_pos, t, dt)
+	local fadeout_data = self._fadeout
+
+	if FPCameraPlayerBase.NO_FADEOUT or self._parent_movement_ext:warping() or self._parent_movement_ext:current_state_name() == "driving" then
+		fadeout_data.value = 0
+		fadeout_data.effect.color.alpha = 0
+
+		return
+	end
+
+	local distance_to_mover = mvector3.distance(new_head_pos:with_z(0), mover_position:with_z(0))
+	local rotation = self._output_data.rotation
+	local dir = mvec_temp1
+
+	mvector3.set(dir, math.Y)
+
+	dir = dir:rotate_with(rotation)
+
+	mvector3.multiply(dir, 20)
+
+	local p_behind = mvec_temp2
+
+	mvector3.set(p_behind, new_head_pos)
+	mvector3.subtract(p_behind, dir)
+
+	local p_ahead = mvec_temp3
+
+	mvector3.set(p_ahead, new_head_pos)
+	mvector3.add(p_ahead, dir)
+
+	local ghost_max_th = 50
+	local fade_distance = 13
+	local distance_to_obstacle = fade_distance
+	local fadeout = 0
+	local ray = self._parent_unit:raycast("ray", p_behind, p_ahead, "slot_mask", fadeout_data.slotmask, "ray_type", "body mover", "sphere_cast_radius", 10, "bundle", 5)
+
+	if ray then
+		local obstacle_min_th = 7
+		local distance = mvector3.distance(new_head_pos, ray.position)
+
+		if distance <= obstacle_min_th then
+			distance_to_obstacle = 0
+		elseif distance < obstacle_min_th + fade_distance then
+			distance_to_obstacle = distance - obstacle_min_th
+		end
+	end
+
+	if distance_to_mover > 10 and distance_to_obstacle > 0 then
+		local obstacle_min_th = 5.5
+		local p_ahead = mvec_temp1
+
+		mvector3.set(p_ahead, new_head_pos)
+		mvector3.subtract(p_ahead, mover_position)
+		mvector3.normalize(p_ahead)
+		mvector3.multiply(p_ahead, 60)
+		mvector3.add(p_ahead, new_head_pos)
+
+		local ray = self._parent_unit:raycast("ray", mover_position, p_ahead, "slot_mask", fadeout_data.slotmask, "ray_type", "body mover", "sphere_cast_radius", 10, "bundle", 5)
+
+		if ray then
+			local d1 = mvector3.distance(mover_position, ray.position)
+			local d2 = mvector3.distance(mover_position, new_head_pos)
+			local d = d1 - d2
+
+			if d1 < d2 or d <= obstacle_min_th then
+				distance_to_obstacle = 0
+			elseif d < obstacle_min_th + fade_distance then
+				distance_to_obstacle = d - obstacle_min_th
+			end
+		end
+	end
+
+	fadeout = 1 - distance_to_obstacle / fade_distance
+
+	if ghost_max_th < distance_to_mover then
+		fadeout = math.max((distance_to_mover - ghost_max_th) / fade_distance, fadeout)
+	end
+
+	fadeout = math.clamp(fadeout, 0, 1)
+
+	if fadeout_data.value < fadeout then
+		fadeout_data.value = math.step(fadeout_data.value, fadeout, fadeout < 1 and dt * 3 or dt * 10)
+		fadeout_data.fadein_speed = 0
+	elseif fadeout < fadeout_data.value then
+		fadeout_data.value = math.step(fadeout_data.value, fadeout, dt * fadeout_data.fadein_speed)
+		fadeout_data.fadein_speed = math.min(fadeout_data.fadein_speed + dt * 1, 0.7)
+	end
+
+	local v = fadeout_data.value
+	fadeout_data.effect.color.alpha = v * v * (3 - 2 * v)
+
+	if fadeout > 0.95 then
+		self._ghost_reset_timer_t = self._ghost_reset_timer_t + dt
+	else
+		self._ghost_reset_timer_t = 0
+	end
+
+	if self._ghost_reset_timer_t > 1.5 then
+		self._parent_movement_ext:reset_ghost_position()
+
+		self._ghost_reset_timer_t = 0
+	end
+end
+
+function FPCameraPlayerBase:set_hmd_tracking(enabled)
+	self._hmd_tracking = enabled
+end
+
+function FPCameraPlayerBase:set_block_input(block)
+	self._block_input = block
+end
+
+function FPCameraPlayerBase:reset_base_rotation(rot)
+	self._base_rotation = Rotation(self._output_data.rotation:yaw(), 0, 0) * rot
+end
+
+function FPCameraPlayerBase:set_base_rotation(rot)
+	self._base_rotation = Rotation(self._base_rotation:yaw() - self._output_data.rotation:yaw(), 0, 0) * rot
+end
+
+function FPCameraPlayerBase:base_rotation()
+	return self._base_rotation
+end
+
+function FPCameraPlayerBase:enter_vehicle()
+	self._initial_hmd_rotation = VRManager:hmd_rotation()
 end
 

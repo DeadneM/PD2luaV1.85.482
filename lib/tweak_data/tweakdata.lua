@@ -45,6 +45,7 @@ require("lib/tweak_data/StoryMissionsTweakData")
 require("lib/tweak_data/PromotionalMenusTweakData")
 require("lib/tweak_data/PromoUnlocksTweakData")
 require("lib/tweak_data/RaidJobsTweakData")
+require("lib/tweak_data/TweakDataVR")
 
 TweakData = TweakData or class()
 
@@ -2367,6 +2368,7 @@ Play the full version soon to get your full PAYDAY!]],
 		}
 	}}
 	self.promos = PromotionalMenusTweakData:new(self)
+	self.vr = TweakDataVR:new()
 
 	self:_init_wip_tweak_data()
 	self:set_difficulty()

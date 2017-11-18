@@ -33,6 +33,11 @@ require("lib/managers/ExplosionManager")
 require("lib/managers/DOTManager")
 require("lib/managers/WaitManager")
 require("lib/units/ArmorSkinExt")
+
+if _G.IS_VR then
+	require("lib/managers/HUDManagerVR")
+end
+
 core:import("SequenceManager")
 
 if Application:editor() then
@@ -52,6 +57,21 @@ require("lib/units/beings/player/PlayerInventory")
 require("lib/units/beings/player/PlayerEquipment")
 require("lib/units/beings/player/PlayerMovement")
 require("lib/player_actions/PlayerAction")
+
+if _G.IS_VR then
+	require("lib/units/beings/player/PlayerHand")
+	require("lib/units/beings/player/PlayerWarp")
+	require("lib/units/beings/player/HandMelee")
+else
+	PlayerHand = PlayerHand or class()
+
+	function PlayerHand:init(unit)
+	end
+
+	function PlayerHand:destroy()
+	end
+end
+
 require("lib/network/base/extensions/NetworkBaseExtension")
 require("lib/units/beings/player/HuskPlayerMovement")
 require("lib/units/beings/player/HuskPlayerInventory")
@@ -130,6 +150,7 @@ require("lib/units/equipment/bodybags_bag/BodyBagsBagBase")
 require("lib/units/ContourExt")
 require("lib/units/BlinkExt")
 require("lib/units/VanSkinExt")
+require("lib/units/IngameUIExt")
 require("lib/units/weapons/RaycastWeaponBase")
 require("lib/units/weapons/NewRaycastWeaponBase")
 require("lib/units/weapons/NPCRaycastWeaponBase")

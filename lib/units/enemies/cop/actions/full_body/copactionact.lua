@@ -116,6 +116,8 @@ CopActionAct._act_redirects.enemy_spawn = {
 	"e_sp_repel_into_window",
 	"e_sp_down_16m_right",
 	"e_sp_down_16m_left",
+	"e_sp_down_8m_right",
+	"e_sp_down_8m_left",
 	"e_sp_up_1_down_9m_var2",
 	"e_sp_up_1_down_9m_var3",
 	"e_sp_down_8m_var3",

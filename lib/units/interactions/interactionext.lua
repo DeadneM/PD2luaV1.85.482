@@ -177,6 +177,12 @@ end
 local is_PS3 = SystemInfo:platform() == Idstring("PS3")
 
 function BaseInteractionExt:_btn_interact()
+	if _G.IS_VR then
+		local button = self._hand_id == PlayerHand.LEFT and "interact_left" or "interact_right"
+
+		return managers.localization:btn_macro(button, false)
+	end
+
 	return managers.localization:btn_macro("interact", false)
 end
 
@@ -211,11 +217,12 @@ function BaseInteractionExt:can_select(player)
 	return true
 end
 
-function BaseInteractionExt:selected(player)
+function BaseInteractionExt:selected(player, locator, hand_id)
 	if not self:can_select(player) then
 		return
 	end
 
+	self._hand_id = hand_id
 	self._is_selected = true
 	local string_macros = {}
 
@@ -2644,9 +2651,18 @@ function DrivingInteractionExt:selected(player, locator)
 	end
 
 	self._action = action
+	self._selected_locator = locator
 	local res = DrivingInteractionExt.super.selected(self, player)
 
 	return res
+end
+
+function DrivingInteractionExt:interact_position()
+	if alive(self._selected_locator) then
+		return self._selected_locator:position()
+	end
+
+	return DrivingInteractionExt.super.interact_position(self)
 end
 
 function DrivingInteractionExt:can_select(player, locator)

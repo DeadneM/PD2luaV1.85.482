@@ -92,7 +92,10 @@ function IngameWaitingForPlayersState:sync_start(variant, soundtrack)
 		managers.music:post_event(start_switch)
 	end
 
-	self._fade_out_id = managers.overlay_effect:play_effect(tweak_data.overlay_effects.fade_out_permanent)
+	if not _G.IS_VR then
+		self._fade_out_id = managers.overlay_effect:play_effect(tweak_data.overlay_effects.fade_out_permanent)
+	end
+
 	local level_data = Global.level_data.level_id and tweak_data.levels[Global.level_data.level_id]
 	self._intro_text_id = level_data and level_data.intro_text_id
 	self._intro_event = level_data and (variant == 0 and level_data.intro_event or level_data.intro_event[variant])
@@ -123,6 +126,14 @@ function IngameWaitingForPlayersState:_start_audio()
 	self._audio_started = true
 
 	managers.menu:close_menu("kit_menu")
+
+	if _G.IS_VR then
+		managers.hud:hide(self.GUI_SAFERECT)
+		managers.hud:hide(self.GUI_FULLSCREEN)
+		managers.menu_component:hide_game_chat_gui()
+		managers.menu_component:close_mission_briefing_gui()
+		managers.menu_component:kill_preplanning_map_gui()
+	end
 
 	local event_started = nil
 	local job_data = managers.job:current_job_data()
@@ -258,6 +269,10 @@ function IngameWaitingForPlayersState:update(t, dt)
 			if self._controller then
 				local btn_skip_press = self._controller:get_input_bool("confirm")
 
+				if _G.IS_VR then
+					btn_skip_press = btn_skip_press or self._controller:get_input_bool("laser_primary")
+				end
+
 				if btn_skip_press and not self._skip_data then
 					self._skip_data = {
 						total = 1,
@@ -289,6 +304,11 @@ function IngameWaitingForPlayersState:update(t, dt)
 end
 
 function IngameWaitingForPlayersState:at_enter()
+	if _G.IS_VR then
+		managers.menu:open_menu("waiting_for_players")
+		managers.overlay_effect:set_hmd_tracking(false)
+	end
+
 	self._started_from_beginning = true
 
 	if Global.job_manager.current_job and Global.job_manager.current_job.current_stage == 1 then
@@ -303,9 +323,9 @@ function IngameWaitingForPlayersState:at_enter()
 	self._sound_listener:activate(true)
 	managers.crime_spree:on_mission_started(managers.crime_spree:current_mission())
 	managers.crimenet:set_job_played_today(managers.job:current_job_id())
-	managers.hud:load_hud(self.GUI_SAFERECT, false, true, true, {})
+	managers.hud:load_hud_menu(self.GUI_SAFERECT, false, true, true, {})
 	managers.hud:show(self.GUI_SAFERECT)
-	managers.hud:load_hud(self.GUI_FULLSCREEN, false, true, false, {}, nil, nil, true)
+	managers.hud:load_hud_menu(self.GUI_FULLSCREEN, false, true, false, {}, nil, nil, true)
 	managers.hud:show(self.GUI_FULLSCREEN)
 	managers.hud._hud_mission_briefing:reload()
 	managers.hud._hud_mission_briefing:show()
@@ -319,10 +339,10 @@ function IngameWaitingForPlayersState:at_enter()
 	end
 
 	if not managers.hud:exists(self.LEVEL_INTRO_GUI) then
-		managers.hud:load_hud(self.LEVEL_INTRO_GUI, false, false, true, {})
+		managers.hud:load_hud_menu(self.LEVEL_INTRO_GUI, false, false, true, {})
 	end
 
-	managers.menu:close_menu()
+	managers.menu:close_menu("pause_menu")
 	managers.menu:open_menu("kit_menu")
 
 	self._kit_menu = managers.menu:get_menu("kit_menu")
@@ -420,7 +440,7 @@ function IngameWaitingForPlayersState:clbk_file_streamer_status(workload)
 end
 
 function IngameWaitingForPlayersState:_chk_show_skip_prompt()
-	if not self._skip_promt_shown and not self._file_streamer_max_workload and not managers.menu:active_menu() and managers.network:session() then
+	if not self._skip_promt_shown and not self._file_streamer_max_workload and (not managers.menu:active_menu() or managers.menu:active_menu().name == "waiting_for_players") and managers.network:session() then
 		if managers.network:session():are_peers_done_streaming() then
 			self._skip_promt_shown = true
 
@@ -457,6 +477,10 @@ function IngameWaitingForPlayersState:check_is_dropin()
 end
 
 function IngameWaitingForPlayersState:at_exit()
+	if _G.IS_VR then
+		managers.menu:close_menu("waiting_for_players")
+	end
+
 	managers.dyn_resource:set_file_streaming_chunk_size_mul(0.25, 5)
 
 	if self._file_streamer_max_workload then
@@ -484,7 +508,10 @@ function IngameWaitingForPlayersState:at_exit()
 	managers.menu_component:close_mission_briefing_gui()
 	managers.menu_component:kill_preplanning_map_gui()
 	managers.overlay_effect:play_effect(tweak_data.overlay_effects.level_fade_in)
-	managers.overlay_effect:stop_effect(self._fade_out_id)
+
+	if self._fade_out_id then
+		managers.overlay_effect:stop_effect(self._fade_out_id)
+	end
 
 	if self._sound_listener then
 		self._sound_listener:delete()
