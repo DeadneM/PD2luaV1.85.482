@@ -9,6 +9,11 @@ function PlayerHandStateWeapon:init(hsm, name, hand_unit, sequence)
 	self._weapon_switch_clbk = callback(self, self, "on_weapon_switch_setting_changed")
 
 	managers.vr:add_setting_changed_callback("weapon_switch_button", self._weapon_switch_clbk)
+
+	self._weapon_assist_toggle_setting = managers.vr:get_setting("weapon_assist_toggle")
+	self._weapon_assist_toggle_clbk = callback(self, self, "on_weapon_assist_toggle_setting_changed")
+
+	managers.vr:add_setting_changed_callback("weapon_assist_toggle", self._weapon_assist_toggle_clbk)
 end
 
 function PlayerHandStateWeapon:destroy()
@@ -18,6 +23,10 @@ end
 
 function PlayerHandStateWeapon:on_weapon_switch_setting_changed(setting, old, new)
 	self._can_switch_weapon_hand = new
+end
+
+function PlayerHandStateWeapon:on_weapon_assist_toggle_setting_changed(setting, old, new)
+	self._weapon_assist_toggle_setting = new
 end
 
 function PlayerHandStateWeapon:_link_weapon(weapon_unit)
@@ -63,6 +72,8 @@ function PlayerHandStateWeapon:at_enter(prev_state)
 		position = Vector3(0, 5, -5)
 	}
 	self._pistol_grip = false
+	self._assist_position = nil
+	self._weapon_assist_toggle = nil
 end
 
 function PlayerHandStateWeapon:at_exit(next_state)
@@ -145,8 +156,10 @@ function PlayerHandStateWeapon:update(t, dt)
 			end
 
 			local interact_btn = self:hsm():hand_id() == PlayerHand.LEFT and "interact_right" or "interact_left"
+			local wants_assist = nil
+			wants_assist = self._weapon_assist_toggle_setting and self._weapon_assist_toggle or controller:get_input_bool(interact_btn)
 
-			if controller:get_input_bool(interact_btn) then
+			if wants_assist then
 				mvector3.set(other_hand, self:hsm():other_hand():position())
 
 				if not self._assist_position then
@@ -189,18 +202,24 @@ function PlayerHandStateWeapon:update(t, dt)
 				end
 
 				if not self._weapon_length then
-					self._weapon_length = mvector3.length(self._assist_position) * 1.5
+					self._weapon_length = mvector3.length(self._assist_position) * 1.75
 				end
 
 				local max_dis = math.max(tweak_data.vr.weapon_assist.limits.max, self._weapon_length)
 
-				if (tweak_data.vr.weapon_assist.limits.min < other_hand_dis or self._pistol_grip) and other_hand_dis < max_dis and (self._pistol_grip or (is_assisting and 0.4 or 0.9) < mvector3.dot(hand_to_hand, self._hand_unit:rotation():y())) then
+				if (tweak_data.vr.weapon_assist.limits.min < other_hand_dis or self._pistol_grip) and other_hand_dis < max_dis and (self._pistol_grip or (is_assisting and 0.35 or 0.9) < mvector3.dot(hand_to_hand, self._hand_unit:rotation():y())) then
 					if not is_assisting and self:hsm():other_hand():can_change_state_by_name("weapon_assist") then
 						self:hsm():other_hand():change_state_by_name("weapon_assist")
 					end
-				elseif is_assisting then
-					self:hsm():other_hand():change_to_default()
-					self._weapon_unit:set_rotation(self._hand_unit:rotation())
+				else
+					if is_assisting then
+						self:hsm():other_hand():change_to_default()
+						self._weapon_unit:set_rotation(self._hand_unit:rotation())
+					end
+
+					if self._weapon_assist_toggle_setting then
+						self._weapon_assist_toggle = false
+					end
 				end
 			elseif self:hsm():other_hand():current_state_name() == "weapon_assist" then
 				self:hsm():other_hand():change_to_default()

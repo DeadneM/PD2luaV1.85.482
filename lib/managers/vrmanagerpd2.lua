@@ -59,6 +59,7 @@ function VRManagerPD2:init()
 		auto_reload = true,
 		weapon_switch_button = false,
 		zipline_screen = true,
+		weapon_assist_toggle = false,
 		default_tablet_hand = "left"
 	}
 	self._limits = {
@@ -190,7 +191,7 @@ function VRManagerPD2:set_force_disable_low_adaptive_quality(disable)
 end
 
 function VRManagerPD2:_update_adaptive_quality_level()
-	local quality_level = self._use_adaptive_quality and VRManager:adaptive_level() + 1 or 3
+	local quality_level = self._use_adaptive_quality and VRManager:adaptive_level() + 1 or 7
 
 	if self._force_disable_low_adaptive_quality then
 		quality_level = math.max(quality_level, 3)
@@ -238,6 +239,8 @@ function VRManagerPD2:load(data)
 		self._global.has_set_height = data.vr.has_set_height
 		self._global.has_shown_savefile_dialog = data.vr.has_shown_savefile_dialog
 	end
+
+	self._global.weapon_assist_toggle = false
 end
 
 function VRManagerPD2:add_setting_changed_callback(setting, callback)

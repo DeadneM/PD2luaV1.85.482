@@ -590,11 +590,11 @@ function HUDBelt:destroy()
 	managers.vr:remove_setting_changed_callback("default_weapon_hand", self._primary_hand_clbk)
 end
 
-function HUDBelt:_reload_setting_changed(setting, new_value)
+function HUDBelt:_reload_setting_changed(setting, old_value, new_value)
 	self:set_state("reload", new_value and "disabled" or "inactive")
 end
 
-function HUDBelt:_primary_hand_changed(setting, new_value)
+function HUDBelt:_primary_hand_changed(setting, old_value, new_value)
 	self:layout_grid(self.grid_layouts[new_value])
 end
 

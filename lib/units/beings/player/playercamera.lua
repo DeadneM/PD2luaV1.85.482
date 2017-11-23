@@ -84,6 +84,10 @@ function PlayerCamera:spawn_camera_unit()
 	end
 end
 
+function PlayerCamera:camera_object()
+	return self._camera_object
+end
+
 function PlayerCamera:camera_unit()
 	return self._camera_unit
 end

@@ -119,7 +119,12 @@ function MenuTitlescreenState:at_enter()
 		color = Color.black
 	})
 	managers.menu_scene:setup_camera()
-	managers.menu_scene:set_scene_template("lobby")
+
+	if _G.IS_VR then
+		managers.menu_scene:set_scene_template("title")
+		managers.menu_scene:set_scene_template("lobby")
+	end
+
 	self._workspace:show()
 	self._full_workspace:show()
 	managers.user:set_index(nil)

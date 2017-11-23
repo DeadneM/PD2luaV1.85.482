@@ -570,8 +570,9 @@ function PlayerStandardVR:_check_action_ladder(t, input)
 		local t_pos = self._state_data.ladder.t_pos
 		local hand = self._unit:hand():get_active_hand_id("idle") == 1 and "right" or "left"
 		local hand_unit = self._unit:hand():hand_unit(hand)
+		local touching = mvector3.length_sq(self._unit:base():controller():get_input_axis("touchpad_warp_target")) > 0.001
 
-		if self._unit:base():controller():get_input_bool("warp_" .. hand) then
+		if touching then
 			if alive(self._ladder_directions) then
 				local aiming_up = hand_unit:rotation():y().z > 0
 
@@ -584,14 +585,16 @@ function PlayerStandardVR:_check_action_ladder(t, input)
 
 				self._ladder_directions:set_position(self._state_data.ladder.current_position + Vector3(0, 40, 50):rotate_with(self._ladder_directions:rotation()))
 			end
-		elseif self._unit:base():controller():get_input_released("warp_" .. hand) then
-			local dir = hand_unit:rotation():y().z > 0 and 1 or -1
-			self._state_data.ladder.t_pos = self._state_data.ladder.t_pos + self._state_data.ladder.step_length * dir
 
-			if alive(self._ladder_directions) then
-				self._ladder_directions:damage():run_sequence_simple("ladder_hide")
+			if self._unit:base():controller():get_input_pressed("warp_" .. hand) then
+				local dir = hand_unit:rotation():y().z > 0 and 1 or -1
+				self._state_data.ladder.t_pos = self._state_data.ladder.t_pos + self._state_data.ladder.step_length * dir
 
-				self._ladder_aiming_up = nil
+				if alive(self._ladder_directions) then
+					self._ladder_directions:damage():run_sequence_simple("ladder_hide")
+
+					self._ladder_aiming_up = nil
+				end
 			end
 		end
 
@@ -845,7 +848,6 @@ function PlayerStandardVR:_check_stop_shooting()
 	if self._shooting and self._shooting_weapons then
 		for k, weap_base in pairs(self._shooting_weapons) do
 			weap_base:stop_shooting()
-			self._camera_unit:base():stop_shooting(weap_base:recoil_wait())
 			self._ext_network:send("sync_stop_auto_fire_sound")
 
 			self._shooting_weapons[k] = nil

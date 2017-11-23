@@ -683,6 +683,7 @@ end
 
 function Setup:load_start_menu()
 	if _G.IS_VR then
+		self:set_main_thread_loading_screen_visible(true)
 		managers.vr:start_loading()
 
 		if managers.overlay_effect then

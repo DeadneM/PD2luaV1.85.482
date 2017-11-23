@@ -131,11 +131,11 @@ function PlayerEquipment:throw_projectile()
 		if Network:is_client() then
 			managers.network:session():send_to_host("request_throw_projectile", projectile_index, pos, dir)
 		else
-			ProjectileBase.throw_projectile(projectile_index, pos, dir, managers.network:session():local_peer():id())
+			ProjectileBase.throw_projectile(projectile_entry, pos, dir, managers.network:session():local_peer():id())
 			managers.player:verify_grenade(managers.network:session():local_peer():id())
 		end
 	else
-		ProjectileBase.throw_projectile(projectile_index, pos, dir, managers.network:session():local_peer():id())
+		ProjectileBase.throw_projectile(projectile_entry, pos, dir, managers.network:session():local_peer():id())
 		managers.player:verify_grenade(managers.network:session():local_peer():id())
 	end
 
@@ -155,12 +155,13 @@ function PlayerEquipment:throw_grenade()
 
 	self._unit:sound():play("g43", nil, true)
 
-	local grenade_index = tweak_data.blackmarket:get_index_from_projectile_id(managers.blackmarket:equipped_grenade())
+	local projectile_entry = managers.blackmarket:equipped_grenade()
+	local grenade_index = tweak_data.blackmarket:get_index_from_projectile_id(projectile_entry)
 
 	if Network:is_client() then
 		managers.network:session():send_to_host("request_throw_projectile", grenade_index, pos, dir)
 	else
-		ProjectileBase.throw_projectile(grenade_index, pos, dir, managers.network:session():local_peer():id())
+		ProjectileBase.throw_projectile(projectile_entry, pos, dir, managers.network:session():local_peer():id())
 		managers.player:verify_grenade(managers.network:session():local_peer():id())
 	end
 

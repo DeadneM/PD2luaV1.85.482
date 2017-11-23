@@ -61,6 +61,10 @@ function MenuSceneManagerVR:_setup_bg()
 		end
 	end
 
+	if alive(self._character_unit) then
+		self._character_unit:set_position(Vector3(0, 0, -500))
+	end
+
 	self:_setup_lobby_characters()
 	self:_setup_henchmen_characters()
 end
@@ -94,6 +98,14 @@ function MenuSceneManagerVR:_set_up_templates()
 	self._scene_templates.standard.target_pos = target_pos
 	self._scene_templates.standard.character_pos = c_ref:position()
 	self._scene_templates.standard.disable_item_updates = true
+	self._scene_templates.title = {
+		use_character_grab = false,
+		character_visible = false,
+		camera_pos = ref:position(),
+		target_pos = target_pos,
+		character_pos = Vector3(0, 0, -500),
+		disable_item_updates = true
+	}
 	local cloned_templates = {
 		"blackmarket",
 		"blackmarket_mask",
@@ -144,7 +156,7 @@ function MenuSceneManagerVR:set_lobby_character_out_fit(i, outfit_string, rank)
 
 	local unit = self._lobby_characters[i]
 	local is_me = i == managers.network:session():local_peer():id()
-	local pos = Vector3(550 - (is_me and 100 or 0), 50 - i * 75, 0)
+	local pos = Vector3(500 - (is_me and 100 or 0), 50 - i * 75, 0)
 
 	unit:set_position(pos)
 	unit:set_rotation(Rotation:look_at(Vector3(0, 100, 0) - pos, math.UP))
@@ -207,5 +219,41 @@ function MenuSceneManagerVR:get_henchmen_positioning(index)
 	local rot = Rotation(180)
 
 	return pos, rot
+end
+
+function MenuSceneManagerVR:create_character_text_panel(peer_id)
+	self._character_text_ws = self._character_text_ws or {}
+	local character = self._lobby_characters[peer_id]
+
+	if not alive(character) then
+		return
+	end
+
+	local ws = self._character_text_ws[peer_id]
+	local w = 300
+	local h = 100
+
+	if not ws then
+		ws = managers.gui_data:get_scene_gui():create_world_workspace(w, h, Vector3(), Vector3(1, 0, 0), Vector3(0, 0, 1))
+		self._character_text_ws[peer_id] = ws
+	end
+
+	local rot = character:rotation()
+
+	ws:set_world(w, h, character:position() + rot:x() * 60 + rot:y() * 45 + rot:z() * 150, -rot:x() * 120, -rot:z() * 40)
+
+	local panel = ws:panel()
+
+	return panel, panel:center()
+end
+
+function MenuSceneManagerVR:clear_character_text_panels()
+	if not self._character_text_ws then
+		return
+	end
+
+	for _, ws in pairs(self._character_text_ws) do
+		ws:panel():clear()
+	end
 end
 

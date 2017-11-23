@@ -135,6 +135,7 @@ function GenericUserManager:setup_setting_map()
 	self:setup_setting(85, "loading_screen_show_hints", true)
 	self:setup_setting(86, "crimenet_filter_modded", true)
 	self:setup_setting(300, "adaptive_quality", true)
+	self:setup_setting(301, "window_zoom", true)
 end
 
 function GenericUserManager:setup_setting(id, name, default_value)
@@ -219,7 +220,8 @@ function GenericUserManager:reset_video_setting_map()
 		"parallax_mapping",
 		"video_aa",
 		"corpse_limit",
-		"adaptive_quality"
+		"adaptive_quality",
+		"window_zoom"
 	}
 
 	for _, name in pairs(settings) do

@@ -787,36 +787,12 @@ function VRCustomizationGui:_setup_sub_menus()
 			end
 		}
 	})
-	self:add_settings_menu("belt", {
-		{
-			setting = "belt_snap",
-			type = "slider",
-			text_id = "menu_vr_belt_snap",
-			params = {snap = 15}
-		},
-		{
-			setting = "belt_height_ratio",
-			type = "trigger",
-			text_id = "menu_vr_belt_height",
-			params = {
-				trigger_text_id = "menu_vr_set_height",
-				value_clbk = function (btn)
-					local belt = btn:parent_menu():object("belt")
-
-					if belt then
-						return belt:height() / managers.vr:get_setting("height")
-					end
-				end,
-				change_clbk = function (btn, value)
-					local belt = btn:parent_menu():object("belt")
-
-					if belt then
-						belt:reset(value * managers.vr:get_setting("height"))
-					end
-				end
-			}
-		}
-	}, function (menu, enabled)
+	self:add_settings_menu("belt", {{
+		setting = "belt_snap",
+		type = "slider",
+		text_id = "menu_vr_belt_snap",
+		params = {snap = 15}
+	}}, function (menu, enabled)
 		if enabled then
 			if not menu:object("belt") then
 				menu:add_object("belt", VRBeltCustomization:new(is_start_menu))
@@ -912,6 +888,12 @@ function VRCustomizationGui:add_settings_menu(id, settings, clbk)
 		for setting, item in pairs(menu._settings) do
 			managers.vr:reset_setting(setting)
 			item.button:setting_changed()
+		end
+
+		for _, object in pairs(menu._objects) do
+			if object.reset then
+				object:reset()
+			end
 		end
 	end)
 
@@ -1051,11 +1033,10 @@ function VRBeltCustomization:init(is_start_menu)
 	managers.menu:active_menu().input:focus(true)
 end
 
-function VRBeltCustomization:reset(reset_value)
-	if reset_value then
-		self._start_height = reset_value
-	end
+function VRBeltCustomization:reset()
+	managers.vr:reset_setting("belt_height_ratio")
 
+	self._start_height = managers.vr:get_setting("belt_height_ratio") * managers.vr:get_setting("height")
 	self._height = self._start_height
 end
 
@@ -1179,6 +1160,10 @@ function VRBeltCustomization:update(t, dt)
 	else
 		self._belt:set_alpha(0.4)
 		self:_set_help_state("inactive")
+	end
+
+	if managers.menu:get_controller():get_input_released("interact") then
+		managers.vr:set_setting("belt_height_ratio", self:height() / managers.vr:get_setting("height"))
 	end
 
 	self._belt_unit:set_position(player:position():with_z(self._height) + math.Y:rotate_with(self._belt_unit:rotation()) * 20)
