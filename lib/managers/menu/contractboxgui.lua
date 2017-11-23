@@ -706,11 +706,17 @@ function ContractBoxGui:update(t, dt)
 	end
 end
 
-function ContractBoxGui:create_character_text(peer_id, x, y, text, icon)
+function ContractBoxGui:create_character_text(peer_id, x, y, text, icon, panel)
+	panel = panel or self._panel
+
+	if _G.IS_VR then
+		panel, x, y = managers.menu_scene:create_character_text_panel(peer_id)
+	end
+
 	self._peers = self._peers or {}
 	local color_id = peer_id
 	local color = tweak_data.chat_colors[color_id] or tweak_data.chat_colors[#tweak_data.chat_colors]
-	self._peers[peer_id] = self._peers[peer_id] or self._panel:text({
+	self._peers[peer_id] = self._peers[peer_id] or panel:text({
 		vertical = "center",
 		blend_mode = "add",
 		align = "center",
@@ -731,7 +737,7 @@ function ContractBoxGui:create_character_text(peer_id, x, y, text, icon)
 	self._peers[peer_id]:set_center(x, y)
 
 	self._peers_state = self._peers_state or {}
-	self._peers_state[peer_id] = self._peers_state[peer_id] or self._panel:text({
+	self._peers_state[peer_id] = self._peers_state[peer_id] or panel:text({
 		vertical = "top",
 		blend_mode = "add",
 		align = "center",
@@ -750,7 +756,7 @@ function ContractBoxGui:create_character_text(peer_id, x, y, text, icon)
 	if icon then
 		local texture = tweak_data.hud_icons:get_icon_data("infamy_icon")
 		self._peers_icon = self._peers_icon or {}
-		self._peers_icon[peer_id] = self._peers_icon[peer_id] or self._panel:bitmap({
+		self._peers_icon[peer_id] = self._peers_icon[peer_id] or panel:bitmap({
 			w = 16,
 			h = 32,
 			texture = texture,
@@ -760,7 +766,7 @@ function ContractBoxGui:create_character_text(peer_id, x, y, text, icon)
 		self._peers_icon[peer_id]:set_right(self._peers[peer_id]:x())
 		self._peers_icon[peer_id]:set_top(self._peers[peer_id]:y())
 	elseif self._peers_icon and self._peers_icon[peer_id] then
-		self._panel:remove(self._peers_icon[peer_id])
+		panel:remove(self._peers_icon[peer_id])
 
 		self._peers_icon[peer_id] = nil
 	end
@@ -770,7 +776,7 @@ function ContractBoxGui:create_character_text(peer_id, x, y, text, icon)
 	if self._peers[peer_id]:visible() and self._peers[peer_id]:text() ~= "" then
 		local level = managers.crime_spree:get_peer_spree_level(peer_id)
 		local text = managers.experience:cash_string(level, "") .. managers.localization:get_default_macro("BTN_SPREE_TICKET")
-		self._peers_spree[peer_id] = self._peers_spree[peer_id] or self._panel:text({
+		self._peers_spree[peer_id] = self._peers_spree[peer_id] or panel:text({
 			vertical = "top",
 			blend_mode = "add",
 			align = "center",
@@ -792,7 +798,7 @@ function ContractBoxGui:create_character_text(peer_id, x, y, text, icon)
 		self._peers_spree[peer_id]:set_center_x(self._peers[peer_id]:center_x())
 		self._peers_spree[peer_id]:set_visible(self._enabled and game_state_machine:gamemode().id == GamemodeCrimeSpree.id and level >= 0)
 	elseif self._peers_spree and self._peers_spree[peer_id] then
-		self._panel:remove(self._peers_spree[peer_id])
+		panel:remove(self._peers_spree[peer_id])
 
 		self._peers_spree[peer_id] = nil
 	end

@@ -2599,6 +2599,10 @@ function MenuComponentManager:close_contract_gui()
 		self._contract_gui:close()
 
 		self._contract_gui = nil
+
+		if _G.IS_VR then
+			managers.menu_scene:clear_character_text_panels()
+		end
 	end
 end
 

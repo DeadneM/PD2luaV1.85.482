@@ -672,13 +672,10 @@ function PlayerMenu:_set_tracking_enabled(enabled)
 end
 
 function PlayerMenu:_set_primary_hand(hand)
-	if self._primary_hand then
-		local offhand = 3 - self._primary_hand
+	local offhand = 3 - hand
 
-		self._hand_state_machine:enter_hand_state(offhand, "empty")
-		self._hands[offhand]:set_state("idle")
-	end
-
+	self._hand_state_machine:enter_hand_state(offhand, "empty")
+	self._hands[offhand]:set_state("idle")
 	self._hand_state_machine:enter_hand_state(hand, "laser")
 	self._hands[hand]:set_state("laser")
 

@@ -411,7 +411,7 @@ function ToggleInputPanel:allow_input()
 end
 
 
-function add_achievement_detail_text(scroll, placer, visual, font_color)
+function add_achievement_detail_text(scroll, placer, visual, info, font_color)
 	if not visual then
 		return
 	end
@@ -482,7 +482,7 @@ function add_achievement_detail_text(scroll, placer, visual, font_color)
 
 	local progress = visual.progress
 
-	if progress and progress.is_list then
+	if progress and progress.is_list and not info.awarded then
 		local todo = progress.get_todo_list()
 		local text = nil
 
@@ -869,7 +869,7 @@ function AchievementListGui:init(ws, fullscreen_ws, node)
 			managers.menu:force_back()
 		end)
 
-		back_btn:set_righttop(self._filter_panel:right(), self._forced_text:top())
+		back_btn:set_righttop(self._filter_panel:right(), self._scroll:bottom())
 	end
 
 	self._all_achievements = {}
@@ -1109,7 +1109,7 @@ function AchievementListGui:update_detail()
 		}), 0)
 	end
 
-	add_achievement_detail_text(self._detail_scroll, placer, visual, tweak_data.screen_colors.achievement_grey)
+	add_achievement_detail_text(self._detail_scroll, placer, visual, info, tweak_data.screen_colors.achievement_grey)
 end
 
 function AchievementListGui:update(...)
@@ -1188,7 +1188,7 @@ function AchievementListGui:_filter_func()
 	if data.hide_ladder then
 		local ladders_locked = {}
 
-		for k, v in pairs(list) do
+		for k, v in pairs(self._all_achievements) do
 			local ladder = v.data.ladder
 
 			if ladder and not v.info.awarded then

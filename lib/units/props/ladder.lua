@@ -54,6 +54,12 @@ function Ladder:set_config()
 	self._w_dir = math.cross(self._up, self._normal)
 	position = position + self._up * self._offset
 	local top = position + self._up * self._height
+	local ray = self._unit:raycast("ray", top, position)
+
+	if ray then
+		position = ray.position
+	end
+
 	self._bottom = position
 	self._top = top
 	self._rotation = Rotation(self._w_dir, self._up, self._normal)
@@ -151,7 +157,9 @@ function Ladder:can_access(pos, move_dir)
 end
 
 function Ladder:_can_access_vr(pos, move_dir)
-	if mvector3.distance_sq(pos, self:bottom()) < 250000 or mvector3.distance_sq(pos, self:top()) < 250000 then
+	local min_dis = tweak_data.vr.ladder.distance * tweak_data.vr.ladder.distance
+
+	if mvector3.distance_sq(pos, self:bottom()) < min_dis or mvector3.distance_sq(pos, self:top()) < min_dis then
 		return true
 	end
 end

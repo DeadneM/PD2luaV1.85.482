@@ -32,7 +32,7 @@ function AkimboWeaponBaseVR:on_reload(...)
 
 	__on_reload(self, ...)
 end
-local __update_reloading = AkimboWeaponBase.update_reloading
+local __update_reloading = NewRaycastWeaponBase.update_reloading
 
 function AkimboWeaponBaseVR:update_reloading(...)
 	if alive(self._second_gun) then
@@ -41,7 +41,7 @@ function AkimboWeaponBaseVR:update_reloading(...)
 
 	__update_reloading(self, ...)
 end
-local __update_reload_finish = AkimboWeaponBase.update_reload_finish
+local __update_reload_finish = NewRaycastWeaponBase.update_reload_finish
 
 function AkimboWeaponBaseVR:update_reload_finish(...)
 	if alive(self._second_gun) and self._second_gun:base():is_finishing_reload() then

@@ -2040,6 +2040,13 @@ function HUDManager:set_ai_stopped(ai_id, stopped)
 				texture_rect = tweak_data.hud_icons.ai_stopped.texture_rect
 			})
 
+			if _G.IS_VR then
+				label_stop_icon:configure({
+					depth_mode = "disabled",
+					render_template = Idstring("OverlayVertexColorTextured")
+				})
+			end
+
 			label_stop_icon:set_right(label.text:left())
 			label_stop_icon:set_center_y(label.text:center_y())
 		end

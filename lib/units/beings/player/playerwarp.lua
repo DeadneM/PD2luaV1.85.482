@@ -157,19 +157,31 @@ function PlayerWarp:set_player_unit(player_unit)
 	self._player_unit = player_unit
 end
 
-function PlayerWarp:set_targeting(enabled)
-	if enabled ~= self._targeting then
+function PlayerWarp:update_ladder_targeting()
+	local min_dis = tweak_data.vr.ladder.distance * tweak_data.vr.ladder.distance
+	local closest = nil
+
+	if self._targeting and #self._ladders > 0 then
 		for _, ladder in ipairs(self._ladders) do
 			local going_down = ladder:ladder():top().z < self._unit:position().z
+			local dis = mvector3.distance_sq(self._unit:position(), going_down and ladder:ladder():top() or ladder:ladder():bottom())
 
-			if enabled and mvector3.distance_sq(self._unit:position(), going_down and ladder:ladder():top() or ladder:ladder():bottom()) < 250000 and mvector3.dot(self._unit:rotation():y(), ladder:ladder():normal() * (going_down and -1 or 1)) < 0 then
-				self:show_ladder_marker(ladder, going_down, true)
-			else
-				self:hide_ladder_marker()
+			if dis < min_dis and mvector3.dot(self._unit:rotation():y(), ladder:ladder():normal() * (going_down and -1 or 1)) < 0 and (not closest or dis < closest) then
+				if self._active_ladder ~= ladder then
+					self:show_ladder_marker(ladder, going_down, true)
+				end
+
+				closest = dis
 			end
 		end
 	end
 
+	if not closest and alive(self._active_ladder) then
+		self:hide_ladder_marker()
+	end
+end
+
+function PlayerWarp:set_targeting(enabled)
 	self._targeting = enabled
 
 	if not self._targeting then
@@ -302,6 +314,8 @@ function PlayerWarp:update(unit, t, dt)
 			brush_debug_print(self._brush_text, text_pos - right * 10, 5, info)
 		end
 	end
+
+	self:update_ladder_targeting()
 end
 
 function PlayerWarp:set_range(range)

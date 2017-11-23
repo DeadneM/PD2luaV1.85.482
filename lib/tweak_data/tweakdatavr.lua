@@ -99,7 +99,7 @@ function TweakDataVR:init()
 		},
 		weapons = {
 			r93 = true,
-			model70 = true,
+			ecp = true,
 			par = true,
 			long = true,
 			flamethrower_mk2 = true,
@@ -107,25 +107,26 @@ function TweakDataVR:init()
 			frankish = true,
 			mosin = true,
 			contraband = true,
+			model70 = true,
 			wa2000 = true,
 			tti = true,
 			siltstone = true,
-			arblast = true,
 			m134 = true,
-			rpk = true,
+			arblast = true,
 			saw = true,
-			mg42 = true,
+			rpk = true,
 			winchester1874 = true,
 			ray = true,
-			hunter = true,
 			rpg7 = true,
+			hunter = true,
 			m32 = true,
 			m249 = true,
 			m95 = true,
-			saw_secondary = true,
+			mg42 = true,
 			china = true,
 			desertfox = true,
 			arbiter = true,
+			saw_secondary = true,
 			gre_m79 = true,
 			plainsrider = true,
 			hk21 = true
@@ -407,7 +408,7 @@ function TweakDataVR:init()
 			erma = {position = Vector3(0, 30, -4)}
 		},
 		limits = {
-			max = 40,
+			max = 50,
 			min = 5
 		}
 	}
@@ -4889,6 +4890,7 @@ function TweakDataVR:init()
 		position = Vector3(0, -5, 5),
 		rotation = Rotation(180, 135, 0)
 	}}
+	self.ladder = {distance = 500}
 	self.autowarp_length = {
 		short = 0.65,
 		long = 1
