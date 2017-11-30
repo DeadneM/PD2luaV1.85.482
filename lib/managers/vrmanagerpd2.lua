@@ -13,6 +13,7 @@ function VRManagerPD2:init()
 	VRManager:set_max_adaptive_levels(7)
 	VRManager:set_present_post_processor(Idstring("core/shaders/render_to_backbuffer"), Idstring("stretch_copy"))
 
+	self._is_oculus = string.find(string.lower(VRManager:hmd_manufacturer()), "oculus") ~= nil
 	local tres = VRManager:target_resolution()
 	local rres = VRManager:recommended_target_resolution()
 	self._adaptive_scale = {}
@@ -30,16 +31,16 @@ function VRManagerPD2:init()
 		local x_scale = scaling / 1.4
 		local res_x = math.floor(tres.x * x_scale)
 
-		if res_x % 2 > 0.01 then
-			res_x = res_x + 1
+		if res_x % 8 > 0.01 then
+			res_x = res_x + 8 - res_x % 8
 		end
 
 		x_scale = res_x / tres.x
 		local y_scale = scaling / 1.4
 		local res_y = math.floor(tres.y * y_scale)
 
-		if res_y % 2 > 0.01 then
-			res_y = res_y + 1
+		if res_y % 8 > 0.01 then
+			res_y = res_y + 8 - res_y % 8
 		end
 
 		y_scale = res_y / tres.y
@@ -60,7 +61,8 @@ function VRManagerPD2:init()
 		weapon_switch_button = false,
 		zipline_screen = true,
 		weapon_assist_toggle = false,
-		default_tablet_hand = "left"
+		default_tablet_hand = "left",
+		rotate_player_angle = 45
 	}
 	self._limits = {
 		height = {
@@ -74,6 +76,10 @@ function VRManagerPD2:init()
 		belt_snap = {
 			max = 360,
 			min = 0
+		},
+		rotate_player_angle = {
+			max = 90,
+			min = 45
 		}
 	}
 
@@ -109,6 +115,10 @@ function VRManagerPD2:init_finalize()
 	managers.user:add_setting_changed_callback("adaptive_quality", self._adaptive_quality_setting_changed_clbk)
 
 	self._use_adaptive_quality = managers.user:get_setting("adaptive_quality")
+end
+
+function VRManagerPD2:is_oculus()
+	return self._is_oculus
 end
 
 function VRManagerPD2:apply_arcade_settings()
@@ -239,8 +249,6 @@ function VRManagerPD2:load(data)
 		self._global.has_set_height = data.vr.has_set_height
 		self._global.has_shown_savefile_dialog = data.vr.has_shown_savefile_dialog
 	end
-
-	self._global.weapon_assist_toggle = false
 end
 
 function VRManagerPD2:add_setting_changed_callback(setting, callback)

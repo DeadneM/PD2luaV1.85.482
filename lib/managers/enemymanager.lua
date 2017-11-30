@@ -33,6 +33,7 @@ function EnemyManager:init()
 	self._shield_disposal_upd_interval = 15
 	self._shield_disposal_lifetime = 60
 	self._MAX_NR_SHIELDS = 8
+	self._queue_buffer = 0
 end
 
 function EnemyManager:update(t, dt)
@@ -494,21 +495,28 @@ end
 
 function EnemyManager:_update_queued_tasks(t, dt)
 	local i_asap_task, asp_task_t = nil
-	local queue_remaining = math.ceil(dt * tweak_data.group_ai.ai_tick_rate)
+	self._queue_buffer = self._queue_buffer + dt
+	local tick_rate = tweak_data.group_ai.ai_tick_rate
 
-	for i_task, task_data in ipairs(self._queued_tasks) do
-		if not task_data.t or task_data.t < t then
-			self:_execute_queued_task(i_task)
+	if tick_rate <= self._queue_buffer then
+		for i_task, task_data in ipairs(self._queued_tasks) do
+			if not task_data.t or task_data.t < t then
+				self:_execute_queued_task(i_task)
 
-			queue_remaining = queue_remaining - 1
+				self._queue_buffer = self._queue_buffer - tick_rate
 
-			if queue_remaining <= 0 then
-				break
+				if self._queue_buffer <= 0 then
+					break
+				end
+			elseif task_data.asap and (not asp_task_t or task_data.t < asp_task_t) then
+				i_asap_task = i_task
+				asp_task_t = task_data.t
 			end
-		elseif task_data.asap and (not asp_task_t or task_data.t < asp_task_t) then
-			i_asap_task = i_task
-			asp_task_t = task_data.t
 		end
+	end
+
+	if #self._queued_tasks == 0 then
+		self._queue_buffer = 0
 	end
 
 	if i_asap_task and not self._queued_task_executed then

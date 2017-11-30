@@ -106,31 +106,50 @@ function PlayerWarp:init(hand_unit)
 	table.insert(self._warp_markers, WarpTargetMarker:new(MARKER_UNIT_ID))
 
 	self._ladders = {}
-	self._ladder_marker = World:spawn_unit(LADDER_UNIT_ID, Vector3(), Rotation())
-
-	self:hide_ladder_marker()
+	self._ladder_markers = {}
 end
 
-function PlayerWarp:show_ladder_marker(ladder, going_down, idle)
-	self._active_ladder = ladder
-	self._going_down_ladder = going_down
+function PlayerWarp:show_ladder_marker(key, active)
+	local ladder_data = self._ladders[key]
 
-	self._ladder_marker:set_position(going_down and ladder:ladder():top() or ladder:ladder():bottom())
+	if ladder_data.active and (self._active_ladder_key == key) == active then
+		return
+	end
+
+	local ladder = ladder_data.ladder
+	ladder_data.active = true
+
+	if active then
+		self._active_ladder_key = key
+	elseif self._active_ladder_key == key then
+		self._active_ladder_key = nil
+	end
+
+	self._ladder_markers[key] = self._ladder_markers[key] or World:spawn_unit(LADDER_UNIT_ID, Vector3(), Rotation())
+	local ladder_marker = self._ladder_markers[key]
+
+	ladder_marker:set_position(ladder_data.going_down and ladder:ladder():top() or ladder:ladder():bottom())
 
 	local ladder_rot = ladder:rotation()
 
-	if going_down then
+	if ladder_data.going_down then
 		ladder_rot = ladder_rot * Rotation(180)
 	end
 
-	self._ladder_marker:set_rotation(ladder_rot)
-	self._ladder_marker:damage():run_sequence_simple("ladder_" .. (going_down and "down" or "up") .. (idle and "_idle" or ""))
+	ladder_marker:set_rotation(ladder_rot)
+	ladder_marker:damage():run_sequence_simple("ladder_" .. (ladder_data.going_down and "down" or "up") .. (active and "" or "_idle"))
 end
 
-function PlayerWarp:hide_ladder_marker()
-	self._active_ladder = nil
+function PlayerWarp:hide_ladder_marker(key)
+	if self._ladders[key] and self._ladders[key].active then
+		self._ladders[key].active = nil
 
-	self._ladder_marker:damage():run_sequence_simple("ladder_hide")
+		self._ladder_markers[key]:damage():run_sequence_simple("ladder_hide")
+
+		if self._active_ladder_key == key then
+			self._active_ladder_key = nil
+		end
+	end
 end
 
 function PlayerWarp:hide_markers()
@@ -158,27 +177,42 @@ function PlayerWarp:set_player_unit(player_unit)
 end
 
 function PlayerWarp:update_ladder_targeting()
-	local min_dis = tweak_data.vr.ladder.distance * tweak_data.vr.ladder.distance
-	local closest = nil
+	if self._ladders_enabled and self._targeting and #Ladder.active_ladders > 0 then
+		for _, ladder in ipairs(Ladder.active_ladders) do
+			ladder:ladder():check_ground_clipping()
 
-	if self._targeting and #self._ladders > 0 then
-		for _, ladder in ipairs(self._ladders) do
-			local going_down = ladder:ladder():top().z < self._unit:position().z
-			local dis = mvector3.distance_sq(self._unit:position(), going_down and ladder:ladder():top() or ladder:ladder():bottom())
+			local can_access = nil
 
-			if dis < min_dis and mvector3.dot(self._unit:rotation():y(), ladder:ladder():normal() * (going_down and -1 or 1)) < 0 and (not closest or dis < closest) then
-				if self._active_ladder ~= ladder then
-					self:show_ladder_marker(ladder, going_down, true)
+			if ladder:ladder():can_access(self._player_unit:position()) then
+				local going_down = ladder:ladder():top().z < self._player_unit:position().z + 75
+				local dis = mvector3.distance_sq(self._unit:position(), going_down and ladder:ladder():top() or ladder:ladder():bottom())
+				self._ladders[ladder:key()] = self._ladders[ladder:key()] or {ladder = ladder}
+
+				if going_down or mvector3.dot(self._unit:rotation():y(), ladder:ladder():normal()) < 0 then
+					self._ladders[ladder:key()].going_down = going_down
+					self._ladders[ladder:key()].distance = dis
+
+					self:show_ladder_marker(ladder:key(), ladder:key() == self._active_ladder_key and self._target.type == "ladder")
+
+					can_access = true
 				end
+			end
 
-				closest = dis
+			if not can_access then
+				self:hide_ladder_marker(ladder:key())
+			end
+		end
+	else
+		for key, ladder_data in pairs(self._ladders) do
+			if ladder_data.active then
+				self:hide_ladder_marker(key)
 			end
 		end
 	end
+end
 
-	if not closest and alive(self._active_ladder) then
-		self:hide_ladder_marker()
-	end
+function PlayerWarp:set_ladders_enabled(enabled)
+	self._ladders_enabled = enabled
 end
 
 function PlayerWarp:set_targeting(enabled)
@@ -212,14 +246,6 @@ function PlayerWarp:add_snap_point(position, type, tolerance, data)
 		tolerance = tolerance,
 		data = data
 	})
-end
-
-function PlayerWarp:clear_ladders()
-	self._ladders = {}
-end
-
-function PlayerWarp:add_ladder(ladder)
-	table.insert(self._ladders, ladder)
 end
 
 
@@ -263,23 +289,45 @@ function PlayerWarp:update(unit, t, dt)
 			end
 		end
 
-		if self._active_ladder then
-			local ladder = self._active_ladder:ladder()
-			local ladder_pos = self._going_down_ladder and ladder:top() or ladder:bottom()
+		local closest_ladder_data = nil
 
-			if mvector3.distance_sq(pos, ladder_pos) < 250000 and mvector3.dot(forward, (ladder_pos - pos):normalized()) > 0.95 then
-				if self._target.type ~= "ladder" then
-					self:show_ladder_marker(self._active_ladder, self._going_down_ladder)
+		for key, ladder_data in pairs(self._ladders) do
+			if ladder_data.active then
+				local ladder = ladder_data.ladder:ladder()
+				local ladder_pos = ladder_data.going_down and ladder:top() or ladder:bottom()
+				local dis = mvector3.distance_sq(pos, ladder_pos)
+				local ray = self._unit:raycast("ray", pos, ladder_pos, "slot_mask", self._slotmask, "ray_type", "body walk")
+
+				if (not ray or mvector3.distance_sq(ray.position, ladder_pos) < 500) and mvector3.dot(forward, (ladder_pos - pos):normalized()) > 0.95 then
+					if not closest_ladder_data or dis < closest_ladder_data.dis then
+						closest_ladder_data = {
+							dis = dis,
+							ladder = ladder_data.ladder,
+							pos = ladder_pos
+						}
+					end
+				elseif self._target.type == "ladder" and self._active_ladder_key == key then
+					self:show_ladder_marker(key)
+				end
+			end
+		end
+
+		if closest_ladder_data then
+			local ladder = closest_ladder_data.ladder
+
+			if self._target.type ~= "ladder" or self._active_ladder_key ~= ladder:key() then
+				if self._active_ladder_key then
+					self:show_ladder_marker(self._active_ladder_key)
 				end
 
-				sp_found = true
-				self._target.position = ladder_pos + ladder:normal() * 40
-				self._target.type = "ladder"
-				self._target.data = self._active_ladder
-				self._aim_position = self._target.position
-			elseif self._target.type == "ladder" then
-				self:show_ladder_marker(self._active_ladder, self._going_down_ladder, true)
+				self:show_ladder_marker(ladder:key(), true)
 			end
+
+			sp_found = true
+			self._target.position = closest_ladder_data.pos + ladder:ladder():normal() * 40
+			self._target.type = "ladder"
+			self._target.data = ladder
+			self._aim_position = self._target.position
 		end
 
 		if not sp_found then
@@ -509,18 +557,6 @@ function PlayerWarp:_is_jump_candidate(player_position, warp_position, warp_targ
 	return true
 end
 
-function PlayerWarp:_can_see_target(position, target)
-	if target then
-		ray = self._unit:raycast("ray", position, target, "slot_mask", self._slotmask, "ray_type", "body walk")
-
-		if ray and mvector3.distance_sq(ray.position, target) > 1 then
-			return false
-		end
-	end
-
-	return true
-end
-
 
 local function clip_line_to_sphere(origin, radius, position, direction)
 	local o_c = position - origin
@@ -591,14 +627,6 @@ function PlayerWarp:_find_target(player_position, position, forward)
 			warp_target = ray.position
 			jump_target = jump_target or ray.position
 		end
-	end
-
-	if warp_target and self._can_see_target(position, warp_target + Vector3(0, 0, 10)) == false then
-		warp_target = nil
-	end
-
-	if jump_target and self._can_see_target(position, jump_target + Vector3(0, 0, 10)) == false then
-		jump_target = nil
 	end
 
 	return warp_target, jump_target

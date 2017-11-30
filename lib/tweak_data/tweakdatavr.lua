@@ -92,6 +92,7 @@ function TweakDataVR:init()
 			rotation = Rotation(180, 110, -40)
 		}
 	}
+	self.magazine_offsets = {default = {}}
 	self.locked = {
 		melee_weapons = {
 			weapon = true,
@@ -99,34 +100,32 @@ function TweakDataVR:init()
 		},
 		weapons = {
 			r93 = true,
-			ecp = true,
+			flamethrower_mk2 = true,
 			par = true,
 			long = true,
-			flamethrower_mk2 = true,
+			ecp = true,
 			msr = true,
 			frankish = true,
 			mosin = true,
 			contraband = true,
-			model70 = true,
 			wa2000 = true,
 			tti = true,
 			siltstone = true,
+			model70 = true,
 			m134 = true,
-			arblast = true,
-			saw = true,
 			rpk = true,
+			arblast = true,
+			mg42 = true,
 			winchester1874 = true,
 			ray = true,
-			rpg7 = true,
 			hunter = true,
+			rpg7 = true,
 			m32 = true,
 			m249 = true,
 			m95 = true,
-			mg42 = true,
 			china = true,
 			desertfox = true,
 			arbiter = true,
-			saw_secondary = true,
 			gre_m79 = true,
 			plainsrider = true,
 			hk21 = true
@@ -172,10 +171,18 @@ function TweakDataVR:init()
 		perks = {[4] = {[9] = {effect = "less"}}}
 	}
 	self.weapon_kick = {
-		return_speed = 10,
 		kick_speed = 200,
 		kick_mul = 1.5,
-		max_kick = 20
+		max_kick = 20,
+		return_speed = 10,
+		exclude_list = {
+			saw_secondary = true,
+			saw = true
+		}
+	}
+	self.custom_wall_check = {
+		saw_secondary = "a_fl",
+		saw = "a_fl"
 	}
 	self.weapon_assist = {
 		weapons = {
@@ -408,8 +415,9 @@ function TweakDataVR:init()
 			erma = {position = Vector3(0, 30, -4)}
 		},
 		limits = {
-			max = 50,
-			min = 5
+			pistol_max = 20,
+			min = 5,
+			max = 50
 		}
 	}
 	self.reload_buff = 0.2
@@ -4823,6 +4831,7 @@ function TweakDataVR:init()
 			}
 		}
 	}
+	self.reload_timelines.saw_secondary = self.reload_timelines.saw
 	self.weapon_sound_overrides = {x_sr2 = {sounds = {
 		fire_single = "sr2_fire_single",
 		fire = "sr2_fire_single",
@@ -5014,6 +5023,15 @@ function TweakDataVR:init()
 			}
 		}
 	}
+	self.overlay_effects = {fade_in_rotate_player = {
+		blend_mode = "normal",
+		sustain = 0,
+		play_paused = true,
+		fade_in = 0,
+		fade_out = 0.21,
+		color = Color(1, 0, 0, 0),
+		timer = TimerManager:main()
+	}}
 end
 
 function TweakDataVR:is_locked(category, id, ...)
@@ -5034,7 +5052,11 @@ function TweakDataVR:is_locked(category, id, ...)
 	return locked
 end
 
-function TweakDataVR:get_offset_by_id(id)
+function TweakDataVR:get_offset_by_id(id, ...)
+	if id == "magazine" then
+		return self:_get_magazine_offsets_by_id(...)
+	end
+
 	if tweak_data.blackmarket.melee_weapons[id] then
 		return self:_get_melee_offset_by_id(id)
 	elseif tweak_data.weapon[id] then
@@ -5103,6 +5125,18 @@ function TweakDataVR:_get_throwable_offsets_by_id(id)
 	end
 
 	combine_offset(offset, self.throwable_offsets.default)
+
+	return offset
+end
+
+function TweakDataVR:_get_magazine_offsets_by_id(id)
+	local offset = {}
+
+	if self.magazine_offsets[id] then
+		combine_offset(offset, self.magazine_offsets[id])
+	end
+
+	combine_offset(offset, self.magazine_offsets.default)
 
 	return offset
 end

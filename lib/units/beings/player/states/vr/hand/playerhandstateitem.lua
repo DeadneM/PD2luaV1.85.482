@@ -293,8 +293,9 @@ function PlayerHandStateItem:update(t, dt)
 	elseif self._item_type == "magazine" then
 		local player = managers.player:player_unit()
 		local weapon = player:inventory():equipped_unit()
+		local mag_locator = weapon:get_object(Idstring("a_m"))
 
-		if mvector3.distance_sq(self._hand_unit:position(), weapon:position()) < 400 then
+		if mvector3.distance_sq(self._hand_unit:position(), (mag_locator or weapon):position()) < 400 then
 			player:movement():current_state():trigger_reload()
 			self:hsm():change_to_default()
 		end

@@ -1,20 +1,50 @@
 require("lib/input/HandState")
 
+
+local function warp_inputs(self)
+	local inputs = {"trackpad_button_"}
+
+	if managers.vr:is_oculus() then
+		table.insert(inputs, "d_up_")
+		table.insert(inputs, "b_")
+	end
+
+	return inputs
+end
+
+
+local function warp_target_inputs(self)
+	local inputs = {"trackpad_button_"}
+
+	if managers.vr:is_oculus() then
+		table.insert(inputs, "b_")
+	end
+
+	return inputs
+end
+
 EmptyHandState = EmptyHandState or class(HandState)
 
 function EmptyHandState:init()
 	EmptyHandState.super.init(self)
 
 	self._connections = {
-		warp_right = {
-			hand = 1,
-			inputs = {"trackpad_button_"}
+		toggle_menu = {
+			inputs = {"menu_"},
+			condition = function (self, hand, key_map)
+				for key, connections in pairs(key_map) do
+					if table.contains(connections, "toggle_menu") then
+						return false
+					end
+				end
+
+				local default_hand = managers.vr:get_setting("default_weapon_hand") == "right" and 1 or 2
+
+				return hand == default_hand
+			end
 		},
-		warp_left = {
-			hand = 2,
-			inputs = {"trackpad_button_"}
-		},
-		touchpad_warp_target = {inputs = {"dpad_"}},
+		warp = {input_function = warp_inputs},
+		warp_target = {input_function = warp_target_inputs},
 		interact_right = {
 			hand = 1,
 			inputs = {"grip_"}
@@ -32,15 +62,8 @@ function PointHandState:init()
 	PointHandState.super.init(self)
 
 	self._connections = {
-		warp_right = {
-			hand = 1,
-			inputs = {"trackpad_button_"}
-		},
-		warp_left = {
-			hand = 2,
-			inputs = {"trackpad_button_"}
-		},
-		touchpad_warp_target = {inputs = {"dpad_"}},
+		warp = {input_function = warp_inputs},
+		warp_target = {input_function = warp_target_inputs},
 		automove = {inputs = {"trigger_"}}
 	}
 end
@@ -50,6 +73,10 @@ function WeaponHandState:init()
 	WeaponHandState.super.init(self)
 
 	self._connections = {
+		toggle_menu = {
+			exclusive = true,
+			inputs = {"menu_"}
+		},
 		primary_attack = {inputs = {"trigger_"}},
 		reload = {inputs = {"grip_"}},
 		switch_hands = {inputs = {"d_up_"}},
@@ -71,7 +98,13 @@ MaskHandState = MaskHandState or class(HandState)
 function MaskHandState:init()
 	MaskHandState.super.init(self)
 
-	self._connections = {use_item = {inputs = {"trigger_"}}}
+	self._connections = {
+		toggle_menu = {
+			exclusive = true,
+			inputs = {"menu_"}
+		},
+		use_item = {inputs = {"trigger_"}}
+	}
 end
 ItemHandState = ItemHandState or class(HandState)
 

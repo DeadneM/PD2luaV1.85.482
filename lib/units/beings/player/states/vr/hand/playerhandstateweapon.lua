@@ -65,6 +65,7 @@ function PlayerHandStateWeapon:at_enter(prev_state)
 	self._weapon_length = nil
 
 	self:hsm():enter_controller_state("weapon")
+	self:hsm():other_hand():enter_controller_state("empty")
 
 	self._default_assist_tweak = {
 		pistol_grip = true,
@@ -77,6 +78,7 @@ function PlayerHandStateWeapon:at_enter(prev_state)
 end
 
 function PlayerHandStateWeapon:at_exit(next_state)
+	self:hsm():exit_controller_state("weapon")
 	self._hand_unit:melee():set_weapon_unit()
 	managers.hud:ammo_panel():set_visible(false)
 	self:_unlink_weapon()
@@ -84,6 +86,10 @@ function PlayerHandStateWeapon:at_exit(next_state)
 end
 
 function PlayerHandStateWeapon:set_wanted_weapon_kick(amount)
+	if alive(self._weapon_unit) and tweak_data.vr.weapon_kick.exclude_list[self._weapon_unit:base().name_id] then
+		return
+	end
+
 	self._wanted_weapon_kick = math.min((self._wanted_weapon_kick or 0) + amount * tweak_data.vr.weapon_kick.kick_mul, tweak_data.vr.weapon_kick.max_kick)
 end
 
@@ -164,9 +170,18 @@ function PlayerHandStateWeapon:update(t, dt)
 
 				if not self._assist_position then
 					self._assist_position = Vector3()
+					local left_handed = self:hsm():hand_id() == PlayerHand.LEFT
 
-					if assist_tweak.position then
+					if left_handed and assist_tweak.left_handed then
+						mvector3.set(self._assist_position, assist_tweak.left_handed)
+
+						self._assist_grip = assist_tweak.grip or "grip_wpn"
+					elseif assist_tweak.position then
 						mvector3.set(self._assist_position, assist_tweak.position)
+
+						if left_handed then
+							mvector3.set_x(self._assist_position, -self._assist_position.x)
+						end
 
 						self._assist_grip = assist_tweak.grip or "grip_wpn"
 					elseif assist_tweak.points then
@@ -205,7 +220,7 @@ function PlayerHandStateWeapon:update(t, dt)
 					self._weapon_length = mvector3.length(self._assist_position) * 1.75
 				end
 
-				local max_dis = math.max(tweak_data.vr.weapon_assist.limits.max, self._weapon_length)
+				local max_dis = math.max(self._pistol_grip and tweak_data.vr.weapon_assist.limits.pistol_max or tweak_data.vr.weapon_assist.limits.max, self._weapon_length)
 
 				if (tweak_data.vr.weapon_assist.limits.min < other_hand_dis or self._pistol_grip) and other_hand_dis < max_dis and (self._pistol_grip or (is_assisting and 0.35 or 0.9) < mvector3.dot(hand_to_hand, self._hand_unit:rotation():y())) then
 					if not is_assisting and self:hsm():other_hand():can_change_state_by_name("weapon_assist") then

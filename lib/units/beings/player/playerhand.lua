@@ -46,6 +46,7 @@ function PlayerHand:init(unit)
 	self._hand_state_machine = HandStateMachine:new(hand_states, hand_states.empty, hand_states.empty)
 
 	self._hand_state_machine:attach_controller(controller, true)
+	self._hand_state_machine:attach_controller(managers.menu:get_controller())
 	managers.vr:set_hand_state_machine(self._hand_state_machine)
 
 	self._controller = controller
@@ -85,8 +86,9 @@ function PlayerHand:init(unit)
 	})
 
 	self._watch = PlayerWatch:new(l_hand_unit)
-	self._hand_data[PlayerHand.RIGHT].state_machine = PlayerHandStateMachine:new(self._hand_data[PlayerHand.RIGHT].unit, PlayerHand.RIGHT)
-	self._hand_data[PlayerHand.LEFT].state_machine = PlayerHandStateMachine:new(self._hand_data[PlayerHand.LEFT].unit, PlayerHand.LEFT)
+	local transition_queue = StateMachineTransitionQueue:new()
+	self._hand_data[PlayerHand.RIGHT].state_machine = PlayerHandStateMachine:new(self._hand_data[PlayerHand.RIGHT].unit, PlayerHand.RIGHT, transition_queue)
+	self._hand_data[PlayerHand.LEFT].state_machine = PlayerHandStateMachine:new(self._hand_data[PlayerHand.LEFT].unit, PlayerHand.LEFT, transition_queue)
 
 	self._hand_data[PlayerHand.RIGHT].state_machine:set_other_hand(self._hand_data[PlayerHand.LEFT].state_machine)
 	self._hand_data[PlayerHand.LEFT].state_machine:set_other_hand(self._hand_data[PlayerHand.RIGHT].state_machine)
@@ -657,7 +659,7 @@ function PlayerHand:check_hand_through_wall(hand, custom_obj)
 end
 
 function PlayerHand:warp_hand()
-	local hand_index = self._hand_state_machine:hand_from_connection("touchpad_warp_target") or PlayerHand.other_hand_id(managers.vr:get_setting("default_weapon_hand"))
+	local hand_index = self._hand_state_machine:hand_from_connection("warp") or PlayerHand.other_hand_id(managers.vr:get_setting("default_weapon_hand"))
 
 	return hand_index == PlayerHand.RIGHT and "right" or "left"
 end

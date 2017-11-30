@@ -2035,6 +2035,10 @@ function FPCameraPlayerBase:reset_base_rotation(rot)
 	self._base_rotation = Rotation(self._output_data.rotation:yaw(), 0, 0) * rot
 end
 
+function FPCameraPlayerBase:rotate_base(rot)
+	self._base_rotation = self._base_rotation * rot
+end
+
 function FPCameraPlayerBase:set_base_rotation(rot)
 	self._base_rotation = Rotation(self._base_rotation:yaw() - self._output_data.rotation:yaw(), 0, 0) * rot
 end
