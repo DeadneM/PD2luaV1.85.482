@@ -194,6 +194,10 @@ function PlayerMenu:position()
 	return self._position
 end
 
+function PlayerMenu:base_rotation()
+	return self._base_rotation
+end
+
 
 local function clip_line_plane(from, line_dir, line_length, n, p)
 	local denom = mvector3.dot(line_dir, n)
@@ -280,17 +284,32 @@ function PlayerMenu:clip_point_to_area(from)
 	}
 end
 
+function PlayerMenu:_rotate_player(right)
+	local angle = managers.vr:get_setting("rotate_player_angle")
+	local rot = right and Rotation(-angle, 0, 0) or Rotation(angle, 0, 0)
+
+	mrotation.multiply(self._base_rotation, rot)
+	managers.overlay_effect:play_effect(tweak_data.vr.overlay_effects.fade_in_rotate_player)
+end
+
 function PlayerMenu:update(t, dt)
+	if self._controller:get_input_pressed("rotate_player_left") then
+		self:_rotate_player(false)
+	end
+
+	if self._controller:get_input_pressed("rotate_player_right") then
+		self:_rotate_player(true)
+	end
+
 	if self._tracking_enabled then
 		local hmd_pos, hmd_rot = VRManager:hmd_pose()
-		hmd_pos = hmd_pos:rotate_with(self._base_rotation)
 
 		mvector3.set(self._hmd_delta, hmd_pos)
 		mvector3.subtract(self._hmd_delta, self._hmd_pos)
 		mvector3.set_z(self._hmd_delta, 0)
 		mvector3.set(self._hmd_pos, hmd_pos)
 
-		self._position = self._position + self._hmd_delta
+		self._position = self._position + self._hmd_delta:rotate_with(self._base_rotation)
 		local pos = mvec_temp1
 
 		mvector3.set(pos, self._position)
@@ -311,7 +330,7 @@ function PlayerMenu:update(t, dt)
 
 		local hmd_horz = mvec_temp1
 
-		mvector3.set(hmd_horz, hmd_pos)
+		mvector3.set(hmd_horz, hmd_pos:rotate_with(self._base_rotation))
 		mvector3.set_z(hmd_horz, 0)
 
 		for i, hand in ipairs(self._hands) do
@@ -549,12 +568,12 @@ end
 
 function PlayerMenu:draw()
 	local hand = self._hands[self._primary_hand]
-	local p, ws = self:raycast(hand:position(), hand:forward())
 	local offset = mvector3.copy(hand:laser_position())
 
 	mvector3.rotate_with(offset, hand:rotation())
 
 	local from = hand:position() + offset
+	local p, ws = self:raycast(from, hand:forward())
 	local to = nil
 
 	if p and ws then
@@ -579,10 +598,9 @@ end
 
 function PlayerMenu:idle_update(t, dt)
 	if self._can_warp or PlayerMenu.DEBUG_WARP then
-		local left = self._controller:get_input_bool("warp_left")
-		local right = self._controller:get_input_bool("warp_right")
+		local warp = self._controller:get_input_bool("warp")
 
-		if mvector3.length_sq(self._controller:get_input_axis("touchpad_warp_target")) > 0.001 and not left and not right then
+		if self._controller:get_input_touch_bool("warp_target") and not warp then
 			self:change_state(PlayerMenu.STATE_TARGETING)
 		end
 	end
@@ -624,9 +642,9 @@ function PlayerMenu:target_update(t, dt)
 
 	self._warp_marker:set_visible(can_warp)
 
-	local targeting = mvector3.length_sq(self._controller:get_input_axis("touchpad_warp_target")) > 0.001
+	local targeting = self._controller:get_input_touch_bool("warp_target")
 
-	if self._controller:get_input_bool("warp_right") or self._controller:get_input_bool("warp_left") then
+	if self._controller:get_input_bool("warp") then
 		if can_warp then
 			self:change_state(PlayerMenu.STATE_WARPING, warp_pos)
 		end
@@ -717,13 +735,14 @@ function PlayerMenu:_setup_states()
 end
 PlayerMenuHandBase = PlayerMenuHandBase or class()
 
-function PlayerMenuHandBase:init(config)
+function PlayerMenuHandBase:init(config, laser_orientation_object)
 	self._base_position = config.base_position or Vector3()
 	self._base_rotation = config.base_rotation or Rotation()
 	self._laser_position = config.laser_position or Vector3()
 	self._position = self._base_position
 	self._rotation = self._base_rotation
 	self._forward = self._base_rotation:y()
+	self._laser_orientation_object = laser_orientation_object
 end
 
 function PlayerMenuHandBase:update_orientation(position, rotation, player_position, hmd_horz)
@@ -755,7 +774,7 @@ function PlayerMenuHandBase:set_state(state)
 end
 
 function PlayerMenuHandBase:laser_position()
-	return self._laser_position
+	return self._laser_orientation_object:local_position()
 end
 
 function PlayerMenuHandBase:set_orientation(position, rotation)
@@ -763,8 +782,6 @@ end
 PlayerMenuHandUnit = PlayerMenuHandUnit or class(PlayerMenuHandBase)
 
 function PlayerMenuHandUnit:init(config)
-	self.super.init(self, config)
-
 	local hand_unit = World:spawn_unit(config.unit_name, Vector3(0, 0, 0), Rotation())
 
 	hand_unit:set_extension_update_enabled(Idstring("warp"), false)
@@ -772,6 +789,8 @@ function PlayerMenuHandUnit:init(config)
 	hand_unit:damage():run_sequence_simple("hide_gadgets")
 
 	self._unit = hand_unit
+
+	self.super.init(self, config, hand_unit:get_object(config.laser_orientation_object))
 end
 
 function PlayerMenuHandUnit:set_orientation(position, rotation)
@@ -790,7 +809,7 @@ end
 PlayerMenuHandObject = PlayerMenuHandObject or class(PlayerMenuHandBase)
 
 function PlayerMenuHandObject:init(config)
-	self.super.init(self, config)
+	self.super.init(self, config, config.laser_orientation_object)
 
 	self._states = config.states
 
@@ -851,13 +870,13 @@ function PlayerMenu:_create_hands()
 				unit_name = Idstring("units/pd2_dlc_vr/player/vr_hand_right"),
 				base_rotation = Rotation(math.X, -50),
 				base_position = Vector3(0, -2, -7),
-				laser_position = Vector3(-0.25, 11, 2.72)
+				laser_orientation_object = Idstring("a_laser")
 			}),
 			PlayerMenuHandUnit:new({
 				unit_name = Idstring("units/pd2_dlc_vr/player/vr_hand_left"),
 				base_rotation = Rotation(math.X, -50),
 				base_position = Vector3(0, -2, -7),
-				laser_position = Vector3(0.25, 11, 2.72)
+				laser_orientation_object = Idstring("a_laser")
 			})
 		}
 	else
@@ -870,7 +889,7 @@ function PlayerMenu:_create_hands()
 				},
 				base_rotation = Rotation(math.X, -50),
 				base_position = Vector3(0, -2, -7),
-				laser_position = Vector3(0.25, 11, 2.72)
+				laser_orientation_object = MenuRoom:get_object(Idstring("a_laser_right"))
 			}),
 			PlayerMenuHandObject:new({
 				default_state = "idle",
@@ -880,7 +899,7 @@ function PlayerMenu:_create_hands()
 				},
 				base_rotation = Rotation(math.X, -50),
 				base_position = Vector3(0, -2, -7),
-				laser_position = Vector3(-0.25, 11, 2.72)
+				laser_orientation_object = MenuRoom:get_object(Idstring("a_laser_left"))
 			})
 		}
 	end
@@ -949,17 +968,20 @@ end
 function PlayerMenu:_laser_ray(visible, from, to)
 	if self._is_start_menu then
 		if visible then
-			self._brush_laser:sphere(to, 0.5)
+			self._brush_laser_dot:sphere(to, 1)
 			self._brush_laser:cylinder(from, to, 0.25)
 		end
 	else
-		local obj = self._laser_ray_obj
+		local ray_obj = self._laser_ray_obj
+		local dot_obj = self._laser_dot_obj
 
 		if visible then
-			obj:cylinder(Color(0.35, 0, 1, 0), from, to, 0.25, 20)
+			ray_obj:cylinder(from, to, 0.25, 20, Color(0.05, 0, 1, 0))
+			dot_obj:sphere(to, 1, 1, Color(1, 0, 1, 0))
 		end
 
-		obj:set_visibility(visible)
+		ray_obj:set_visibility(visible)
+		dot_obj:set_visibility(visible)
 	end
 end
 
@@ -998,10 +1020,15 @@ function PlayerMenu:_setup_draw()
 
 		self._brush_warp:set_blend_mode("opacity_add")
 
-		self._brush_laser = Draw:brush(Color(0.15, 0, 1, 0))
+		self._brush_laser = Draw:brush(Color(0.05, 0, 1, 0))
 
 		self._brush_laser:set_blend_mode("opacity_add")
 		self._brush_laser:set_render_template(Idstring("LineObject"))
+
+		self._brush_laser_dot = Draw:brush(Color(1, 0, 1, 0))
+
+		self._brush_laser_dot:set_blend_mode("opacity_add")
+		self._brush_laser_dot:set_render_template(Idstring("LineObject"))
 
 		self._warp_marker = World:spawn_unit(Idstring("units/pd2_dlc_vr/player/vr_warper"), Vector3(0, 0, 0), Rotation())
 
@@ -1010,6 +1037,10 @@ function PlayerMenu:_setup_draw()
 		self._laser_ray_obj = MenuRoom:get_object(Idstring("laser_ray"))
 
 		self._laser_ray_obj:set_visibility(false)
+
+		self._laser_dot_obj = MenuRoom:get_object(Idstring("laser_dot"))
+
+		self._laser_dot_obj:set_visibility(false)
 	end
 end
 

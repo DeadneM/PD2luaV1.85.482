@@ -6,6 +6,11 @@ Ladder.LADDERS_PER_FRAME = 1
 Ladder.SNAP_LENGTH = 125
 Ladder.SEGMENT_LENGTH = 200
 Ladder.MOVER_NORMAL_OFFSET = 30
+
+if _G.IS_VR then
+	Ladder.MOVER_NORMAL_OFFSET = 60
+end
+
 Ladder.EXIT_OFFSET_TOP = 50
 Ladder.ON_LADDER_NORMAL_OFFSET = 60
 Ladder.DEBUG = false
@@ -40,7 +45,7 @@ function Ladder:init(unit)
 	table.insert(Ladder.ladders, self._unit)
 end
 
-function Ladder:set_config()
+function Ladder:set_config(check_ground_clipping)
 	self._ladder_orientation_obj = self._unit:get_object(Idstring(self._ladder_orientation_obj_name))
 	local rotation = self._ladder_orientation_obj:rotation()
 	local position = self._ladder_orientation_obj:position()
@@ -54,10 +59,13 @@ function Ladder:set_config()
 	self._w_dir = math.cross(self._up, self._normal)
 	position = position + self._up * self._offset
 	local top = position + self._up * self._height
-	local ray = self._unit:raycast("ray", top, position)
 
-	if ray then
-		position = ray.position
+	if check_ground_clipping then
+		local ray = self._unit:raycast("ray", top + self._normal * 10, position + self._normal * 10, "slot_mask", 1)
+
+		if ray then
+			position = ray.position - self._normal * 10
+		end
 	end
 
 	self._bottom = position
@@ -100,6 +108,14 @@ function Ladder:set_config()
 
 	self._up_dot = math.dot(self._up, math.UP)
 	self._w_dir_half = self._w_dir * self._width * 0.5
+end
+
+function Ladder:check_ground_clipping()
+	if not self._has_checked_ground then
+		self:set_config(true)
+
+		self._has_checked_ground = true
+	end
 end
 
 function Ladder:update(t, dt)

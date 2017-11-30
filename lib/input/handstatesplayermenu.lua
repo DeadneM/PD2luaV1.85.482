@@ -19,16 +19,12 @@ M.EmptyHandState.init = function (self)
 
 	self._connections = {
 		toggle_menu = {inputs = {"menu_"}},
-		warp_right = {
-			hand = 1,
-			inputs = {"trackpad_button_"}
-		},
-		warp_left = {
-			hand = 2,
-			inputs = {"trackpad_button_"}
-		},
 		cancel = {inputs = {"grip_"}},
-		touchpad_warp_target = {inputs = {"dpad_"}}
+		warp = {inputs = {
+			"trackpad_button_",
+			"d_up_"
+		}},
+		warp_target = {inputs = {"trackpad_button_"}}
 	}
 end
 M.LaserHandState = M.LaserHandState or class(HandState)

@@ -1,4 +1,4 @@
-core:import("CoreGameStateMachine")
+require("lib/utils/StateMachine")
 require("lib/units/beings/player/states/vr/hand/PlayerHandStateStandard")
 require("lib/units/beings/player/states/vr/hand/PlayerHandStateReady")
 require("lib/units/beings/player/states/vr/hand/PlayerHandStateWeapon")
@@ -12,9 +12,9 @@ require("lib/units/beings/player/states/vr/hand/PlayerHandStateWeaponAssist")
 require("lib/units/beings/player/states/vr/hand/PlayerHandStateCuffed")
 require("lib/units/beings/player/states/vr/hand/PlayerHandStateDriving")
 
-PlayerHandStateMachine = PlayerHandStateMachine or class(CoreGameStateMachine.GameStateMachine)
+PlayerHandStateMachine = PlayerHandStateMachine or class(StateMachine)
 
-function PlayerHandStateMachine:init(hand_unit, hand_id)
+function PlayerHandStateMachine:init(hand_unit, hand_id, transition_queue)
 	self._hand_id = hand_id
 	self._hand_unit = hand_unit
 	local idle = PlayerHandStateStandard:new(self, "idle", hand_unit, "idle")
@@ -44,7 +44,7 @@ function PlayerHandStateMachine:init(hand_unit, hand_id)
 	local item_to_swipe = callback(nil, item, "swipe_transition")
 	local swipe_to_item = callback(nil, swipe, "item_transition")
 
-	CoreGameStateMachine.GameStateMachine.init(self, idle)
+	PlayerHandStateMachine.super.init(self, idle, transition_queue)
 	self:add_transition(idle, weapon, idle_func)
 	self:add_transition(idle, item, idle_func)
 	self:add_transition(idle, point, idle_func)
@@ -191,19 +191,6 @@ function PlayerHandStateMachine:can_change_state_by_name(state_name)
 	local state = assert(self._states[state_name], "[PlayerHandStateMachine] Name '" .. tostring(state_name) .. "' does not correspond to a valid state.")
 
 	return self:can_change_state(state)
-end
-
-function PlayerHandStateMachine:change_state(state, params, front)
-	if front then
-		self._queued_transitions = self._queued_transitions or {}
-
-		table.insert(self._queued_transitions, 1, {
-			state,
-			params
-		})
-	else
-		PlayerHandStateMachine.super.change_state(self, state, params)
-	end
 end
 
 function PlayerHandStateMachine:change_state_by_name(state_name, params, front)

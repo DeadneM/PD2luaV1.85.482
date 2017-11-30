@@ -108,7 +108,7 @@ function VRButton:init(panel, id, params)
 	})
 	self._text = self._panel:text({
 		font_size = 50,
-		text = managers.localization:to_upper_text(params.text_id),
+		text = not params.skip_localization and managers.localization:to_upper_text(params.text_id) or params.text_id,
 		font = tweak_data.menu.pd2_massive_font
 	})
 
@@ -128,8 +128,8 @@ function VRButton:set_selected(selected)
 	end
 end
 
-function VRButton:set_text(text_id)
-	self._text:set_text(managers.localization:to_upper_text(text_id))
+function VRButton:set_text(text_id, skip_localization)
+	self._text:set_text(not skip_localization and managers.localization:to_upper_text(text_id) or text_id)
 	make_fine_text(self._text)
 	self._text:set_center_x(self._panel:w() / 2)
 end
@@ -258,7 +258,7 @@ function VRSettingButton:init(panel, id, params)
 		Application:error("Tried to add a setting button without a setting!")
 	end
 
-	params.text_id = self:_get_setting_text(managers.vr:get_setting(params.setting))
+	params.text_id, params.skip_localization = self:_get_setting_text(managers.vr:get_setting(params.setting))
 
 	VRSettingButton.super.init(self, panel, id, params)
 
@@ -268,6 +268,8 @@ end
 function VRSettingButton:_get_setting_text(value)
 	if type(value) == "boolean" then
 		return value and "menu_vr_on" or "menu_vr_off"
+	elseif type(value) == "number" then
+		return tostring(value), true
 	else
 		return "menu_vr_" .. tostring(value)
 	end
@@ -829,6 +831,23 @@ function VRCustomizationGui:_setup_sub_menus()
 				"left",
 				"right"
 			}}
+		},
+		{
+			setting = "weapon_assist_toggle",
+			type = "button",
+			text_id = "menu_vr_weapon_assist_toggle"
+		},
+		{
+			type = "multi_button",
+			setting = "rotate_player_angle",
+			text_id = "menu_vr_rotate_player_angle",
+			params = {options = {
+				45,
+				90
+			}},
+			visible = function ()
+				return managers.vr:is_oculus()
+			end
 		}
 	})
 	self:add_settings_menu("advanced", {
@@ -898,7 +917,11 @@ function VRCustomizationGui:add_settings_menu(id, settings, clbk)
 	end)
 
 	for _, setting in ipairs(settings) do
-		menu:add_setting(setting.type, setting.text_id, setting.setting, setting.params)
+		local visible = settings.visible == nil or type(settings.visible) == "function" and settings.visible() or not not settings.visible
+
+		if visible then
+			menu:add_setting(setting.type, setting.text_id, setting.setting, setting.params)
+		end
 	end
 
 	self._sub_menus[id] = menu
@@ -1025,8 +1048,8 @@ function VRBeltCustomization:init(is_start_menu)
 	self._height = managers.vr:get_setting("height") * managers.vr:get_setting("belt_height_ratio")
 	self._start_height = self._height
 
-	self._belt_unit:set_position(is_start_menu and Vector3(-320, 10, self._height) or player:position():with_z(self._height) - Vector3(20, 0, 0))
-	self._belt_unit:set_rotation(Rotation(90))
+	self._belt_unit:set_position(player:position():with_z(self._height) - Vector3(20, 0, 0))
+	self._belt_unit:set_rotation(Rotation((VRManager:hmd_rotation() * player:base_rotation()):yaw()))
 	self._belt:set_alpha(0.4)
 	player._hand_state_machine:enter_hand_state(player:primary_hand_index(), "customization")
 	managers.menu:active_menu().input:focus(false)
@@ -1168,7 +1191,7 @@ function VRBeltCustomization:update(t, dt)
 
 	self._belt_unit:set_position(player:position():with_z(self._height) + math.Y:rotate_with(self._belt_unit:rotation()) * 20)
 
-	local hmd_rot = VRManager:hmd_rotation()
+	local hmd_rot = VRManager:hmd_rotation() * player:base_rotation()
 	local snap_angle = managers.vr:get_setting("belt_snap")
 	local yaw_rot = Rotation(hmd_rot:yaw())
 	local angle = Rotation:rotation_difference(Rotation(self._belt_unit:rotation():yaw()), yaw_rot):yaw()

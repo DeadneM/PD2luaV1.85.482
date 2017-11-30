@@ -1557,7 +1557,7 @@ function NetworkPeer:_reload_outfit()
 	end
 
 	local melee_tweak_data = tweak_data.blackmarket.melee_weapons[complete_outfit.melee_weapon]
-	local melee_u_name = is_local_peer and not _G.IS_VR and melee_tweak_data.unit or melee_tweak_data.third_unit
+	local melee_u_name = is_local_peer and melee_tweak_data.unit or melee_tweak_data.third_unit
 
 	if melee_u_name then
 		new_outfit_assets.unit.melee_w = {name = Idstring(melee_u_name)}
