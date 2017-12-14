@@ -1000,6 +1000,13 @@ function AchievementsTweakData:init(tweak_data)
 			is_not_civilian = true,
 			challenge_stat = "challenge_melee_creeps",
 			mutators = {"MutatorExplodingEnemies"}
+		},
+		rvd_12 = {
+			melee_id = "clean",
+			job = "rvd",
+			stat = "rvd_12_stats",
+			difficulty = overkill_and_above,
+			enemy_tags_all = {"special"}
 		}
 	}
 	self.complete_heist_achievements = {
@@ -3600,6 +3607,49 @@ function AchievementsTweakData:init(tweak_data)
 			job = "fish",
 			difficulty = overkill_and_above
 		},
+		rvd_1 = {
+			award = "rvd_1",
+			job = "rvd",
+			difficulty = normal_and_above
+		},
+		rvd_2 = {
+			award = "rvd_2",
+			job = "rvd",
+			difficulty = hard_and_above
+		},
+		rvd_3 = {
+			award = "rvd_3",
+			job = "rvd",
+			difficulty = veryhard_and_above
+		},
+		rvd_4 = {
+			award = "rvd_4",
+			job = "rvd",
+			difficulty = overkill_and_above
+		},
+		rvd_5 = {
+			award = "rvd_5",
+			job = "rvd",
+			difficulty = easywish_and_above
+		},
+		rvd_6 = {
+			award = "rvd_6",
+			job = "rvd",
+			difficulty = deathwish_and_above
+		},
+		rvd_7 = {
+			award = "rvd_7",
+			job = "rvd",
+			difficulty = sm_wish_and_above
+		},
+		rvd_8 = {
+			melee_used = false,
+			award = "rvd_8",
+			job = "rvd",
+			difficulty = overkill_and_above,
+			weapons_used = {"corgi"},
+			equipped = {primaries = {weapon_id = "corgi"}}
+		},
 		bain_jobs = {
 			complete_job = true,
 			contract = "bain",
@@ -4568,7 +4618,8 @@ function AchievementsTweakData:init(tweak_data)
 			"gallery",
 			"rat",
 			"cage",
-			"arena"
+			"arena",
+			"rvd"
 		},
 		the_dentist = {
 			"big",
@@ -4604,7 +4655,9 @@ function AchievementsTweakData:init(tweak_data)
 		},
 		events = {
 			"nail",
-			"help"
+			"help",
+			"haunted",
+			"hvh"
 		},
 		the_continental = {
 			"spa",
@@ -4871,6 +4924,10 @@ function AchievementsTweakData:init(tweak_data)
 		eng_4_stats = {{
 			award = "eng_4",
 			at = 5
+		}},
+		rvd_12_stats = {{
+			award = "rvd_12",
+			at = 92
 		}}
 	}
 	local jobs = {}
